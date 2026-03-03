@@ -1,0 +1,257 @@
+{
+  "schema": {
+    "name": "void_effect_rules",
+    "version": "1.0.0",
+    "module": "FOOTPRINT_DEDUCTION",
+    "purpose": "Deduct floor usable area by void footprint across span floors. Keep EP1 program tree unchanged; output per-floor adjustments log."
+  },
+
+  "inputs_expected": {
+    "building": {
+      "floors_total": "integer >= 1",
+      "floor_plates": {
+        "mode": "ONE_PLATE | PER_FLOOR",
+        "default_plate_area_m2": "number > 0",
+        "per_floor_plate_area_m2": "optional map<int, number>"
+      }
+    },
+    "ep1_area": {
+      "gfa_total_m2": "number > 0 (optional)",
+      "net_program_total_m2": "number > 0 (optional)"
+    },
+    "void_nodes": "VoidNode[] (must include span + footprint)"
+  },
+
+  "global_policy": {
+    "deduct_only_within_span_floors": true,
+    "plate_area_source_priority": ["PER_FLOOR", "DEFAULT"],
+    "min_remaining_usable_ratio": 0.55,
+    "max_deduct_ratio_per_floor": 0.35,
+
+    "rounding": {
+      "area_m2_precision": 0.1,
+      "ratio_precision": 0.001
+    },
+
+    "counts_as_gfa_policy": {
+      "default_counts_as_gfa": false,
+      "note": "counts_as_gfa affects reporting, not the physical usable deduction."
+    },
+
+    "conflict_handling": {
+      "if_remaining_below_min_ratio": "CLAMP_AND_WARN",
+      "if_deduct_ratio_above_max": "CLAMP_AND_WARN",
+      "if_void_has_per_floor_override": "USE_OVERRIDE"
+    }
+  },
+
+  "footprint_modes": {
+    "RATIO": {
+      "meaning": "Deduct plate_area * ratio each floor in span.",
+      "expected_value_range": [0.001, 0.5]
+    },
+    "AREA_M2": {
+      "meaning": "Deduct fixed m2 each floor in span.",
+      "expected_value_range": [1, 999999]
+    },
+    "BY_SPACE_SET": {
+      "meaning": "Deduct by sum(allocated_area of anchor_spaces) * multiplier (handled at implementation).",
+      "expected_value_range": [0.1, 2.0]
+    }
+  },
+
+  "void_type_default_footprint": {
+    "COURTYARD_VOID": {
+      "mode": "RATIO",
+      "value": 0.10,
+      "counts_as_gfa": false,
+      "notes": "Courtyard is often stronger at lower levels; keep modest deduction."
+    },
+    "ATRIUM": {
+      "mode": "RATIO",
+      "value": 0.12,
+      "counts_as_gfa": false,
+      "notes": "Atrium is a main volumetric void; medium deduction."
+    },
+    "DOUBLE_HEIGHT": {
+      "mode": "BY_SPACE_SET",
+      "value": 1.0,
+      "counts_as_gfa": false,
+      "notes": "Typically partial void around a specific space (lounge/lobby)."
+    },
+    "INDUSTRIAL_HIGH_BAY": {
+      "mode": "RATIO",
+      "value": 0.18,
+      "counts_as_gfa": false,
+      "notes": "High-bay tends to be large; allow bigger deduction but clamp by max_deduct_ratio_per_floor."
+    },
+    "RAMP_CONTINUUM": {
+      "mode": "RATIO",
+      "value": 0.08,
+      "counts_as_gfa": false,
+      "notes": "Ramp consumes area but also functions as circulation; keep smaller than atrium."
+    },
+    "LIGHT_WELL": {
+      "mode": "RATIO",
+      "value": 0.03,
+      "counts_as_gfa": false,
+      "notes": "Long and thin; small deduction per floor."
+    },
+    "MEZZANINE_OVERLAP": {
+      "mode": "RATIO",
+      "value": 0.06,
+      "counts_as_gfa": false,
+      "notes": "Partial overlap; moderate deduction."
+    }
+  },
+
+  "pattern_footprint_adjustments": [
+    {
+      "if_any_patterns": ["EFFICIENCY", "CENTRALIZED", "MONOLITHIC"],
+      "apply": { "ratio_multiplier": 0.85 },
+      "reason": "Efficiency-driven projects prefer smaller void footprints."
+    },
+    {
+      "if_any_patterns": ["PUBLIC_HALL", "RADIAL_HALL", "CORE_PERIMETER"],
+      "apply": { "ratio_multiplier": 1.10 },
+      "reason": "Public hall / central focus supports slightly larger void footprint."
+    },
+    {
+      "if_any_patterns": ["COURTYARD_RING"],
+      "apply": { "force_void_type_defaults": ["COURTYARD_VOID"], "ratio_multiplier": 1.00 },
+      "reason": "Courtyard logic stabilizes; avoid aggressive resizing."
+    }
+  ],
+
+  "floor_level_modifiers": [
+    {
+      "when_floor_is": "GROUND_ONLY",
+      "apply": { "ratio_multiplier": 1.05 },
+      "reason": "Ground floor void footprint can be slightly larger for entry legibility."
+    },
+    {
+      "when_floor_is": "TOP_ONLY",
+      "apply": { "ratio_multiplier": 0.90 },
+      "reason": "Top floors often need more usable area; reduce deduction."
+    }
+  ],
+
+  "deduction_algorithm": {
+    "steps": [
+      "1) For each void_node: determine effective footprint spec.",
+      "   - Start from void_node.footprint if present; else use void_type_default_footprint[void_type].",
+      "   - Apply pattern_footprint_adjustments (ratio_multiplier).",
+      "   - Apply floor_level_modifiers per floor if applicable.",
+      "2) For each floor f within void span:",
+      "   - Read plate_area_m2 (per-floor if available else default).",
+      "   - Compute deduct_area_m2 by mode:",
+      "       RATIO: plate_area_m2 * effective_ratio",
+      "       AREA_M2: effective_area_m2",
+      "       BY_SPACE_SET: sum(anchor_space.allocated_area_m2) * value (implementation resolves anchor areas)",
+      "   - Enforce clamps:",
+      "       deduct_ratio <= max_deduct_ratio_per_floor",
+      "       remaining_ratio >= min_remaining_usable_ratio",
+      "   - remaining_usable_m2 = plate_area_m2 - deduct_area_m2",
+      "3) Emit footprint_adjustments[] log entries per (void_id, floor).",
+      "4) Optionally emit warnings when clamps activated."
+    ],
+
+    "outputs": {
+      "footprint_adjustments": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "floor",
+            "void_id",
+            "plate_area_m2",
+            "deduct_area_m2",
+            "remaining_usable_m2",
+            "deduct_mode",
+            "effective_value",
+            "counts_as_gfa",
+            "clamps_applied"
+          ],
+          "properties": {
+            "floor": { "type": "integer" },
+            "void_id": { "type": "string" },
+
+            "plate_area_m2": { "type": "number" },
+            "deduct_area_m2": { "type": "number" },
+            "remaining_usable_m2": { "type": "number" },
+
+            "deduct_mode": { "type": "string", "enum": ["RATIO", "AREA_M2", "BY_SPACE_SET"] },
+            "effective_value": { "type": "number", "description": "ratio or m2 or multiplier depending on mode" },
+
+            "counts_as_gfa": { "type": "boolean" },
+
+            "clamps_applied": {
+              "type": "object",
+              "required": ["max_deduct_ratio", "min_remaining_ratio"],
+              "properties": {
+                "max_deduct_ratio": { "type": "boolean" },
+                "min_remaining_ratio": { "type": "boolean" }
+              }
+            },
+
+            "debug": {
+              "type": "object",
+              "properties": {
+                "raw_deduct_area_m2": { "type": "number" },
+                "raw_deduct_ratio": { "type": "number" },
+                "pattern_multiplier": { "type": "number" },
+                "floor_multiplier": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["void_id", "floor", "code", "message"],
+          "properties": {
+            "void_id": { "type": "string" },
+            "floor": { "type": "integer" },
+            "code": {
+              "type": "string",
+              "enum": ["CLAMP_MAX_DEDUCT", "CLAMP_MIN_REMAINING", "MISSING_PLATE_AREA", "MISSING_ANCHOR_AREA"]
+            },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+
+  "examples": [
+    {
+      "case": "Atrium spans 1-2 in 10-floor building, default plate 1200m2",
+      "given": {
+        "plate_area_m2": 1200,
+        "void_type": "ATRIUM",
+        "span": { "start_floor": 1, "end_floor": 2 },
+        "effective_footprint": { "mode": "RATIO", "value": 0.12 }
+      },
+      "expect_per_floor": {
+        "deduct_area_m2": 144,
+        "remaining_usable_m2": 1056
+      }
+    },
+    {
+      "case": "Light well spans 2-8, plate 900m2, ratio 0.03",
+      "given": {
+        "plate_area_m2": 900,
+        "void_type": "LIGHT_WELL",
+        "span": { "start_floor": 2, "end_floor": 8 },
+        "effective_footprint": { "mode": "RATIO", "value": 0.03 }
+      },
+      "expect_per_floor": {
+        "deduct_area_m2": 27,
+        "remaining_usable_m2": 873
+      }
+    }
+  ]
+}

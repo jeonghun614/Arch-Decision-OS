@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Checkpoint, ProjectState, SelectionState, CHECKPOINT_ORDER, CHECKPOINT_LABELS, CHECKPOINT_LIMITS, VisualGuide, BlueprintJSON } from './types';
 import { runKernel, generateFinalReport, generateVisualGuide, generateImagePrompt } from './services/geminiService';
+import { runEP1ProgramTree } from './services/ep1Service';
+import { runEP2Pipeline } from './services/ep2Runner';
 import { compileGrammar } from './services/grammarCompiler';
 import mappingData from './data/dc_to_grammar_mapping.json';
 
@@ -31,7 +33,9 @@ const App: React.FC = () => {
     lastEngineOutput: null,
     completed: false,
     finalReport: null,
-    grammarResult: null
+    grammarResult: null,
+    ep1Status: 'idle',
+    ep2Status: 'idle',
   });
 
   const [isStarted, setIsStarted] = useState(false);
@@ -118,17 +122,54 @@ const App: React.FC = () => {
       setGeneratingReport(true);
       try {
           const report = await generateFinalReport(state.logs, { name: state.projectName, description: state.projectDescription });
-          
-          // Compile grammar once report is ready
+
+          // Step 1: Compile base grammar (기존 로직 유지)
           const grammarResult = compileGrammar(state.siteInputs, state.logs, report.core_logic + " " + report.causality);
-          
-          setState(prev => ({ 
-            ...prev, 
+
+          setState(prev => ({
+            ...prev,
             finalReport: report,
-            grammarResult: grammarResult
+            grammarResult: grammarResult,
+            ep1Status: 'loading',
           }));
+
+          // Step 2: EP1 — Gemini + EP1 규칙으로 Program Tree 생성
+          let apiKey = '';
+          if (window.aistudio) {
+            apiKey = await window.aistudio.getApiKey?.() ?? '';
+          }
+          // AI Studio 환경에서는 process.env.API_KEY 사용 가능
+          if (!apiKey) apiKey = (import.meta as any).env?.VITE_API_KEY ?? process.env.API_KEY ?? '';
+
+          const programTree = await runEP1ProgramTree(grammarResult, apiKey);
+
+          setState(prev => ({
+            ...prev,
+            ep1Status: 'done',
+            ep2Status: 'loading',
+            grammarResult: prev.grammarResult
+              ? { ...prev.grammarResult, program_tree: programTree }
+              : prev.grammarResult,
+          }));
+
+          // Step 3: EP2 — JS 엔진으로 Void 효과 계산 (동기, 브라우저 실행)
+          const ep2Output = runEP2Pipeline(programTree, grammarResult);
+
+          setState(prev => ({
+            ...prev,
+            ep2Status: 'done',
+            grammarResult: prev.grammarResult
+              ? { ...prev.grammarResult, ep2: ep2Output }
+              : prev.grammarResult,
+          }));
+
       } catch (e) {
           console.error(e);
+          setState(prev => ({
+            ...prev,
+            ep1Status: prev.ep1Status === 'loading' ? 'error' : prev.ep1Status,
+            ep2Status: prev.ep2Status === 'loading' ? 'error' : prev.ep2Status,
+          }));
       } finally {
           setGeneratingReport(false);
       }
@@ -613,6 +654,30 @@ const App: React.FC = () => {
 
                                 {activeTab === 'json' && (
                                     <div className="animate-in fade-in duration-500 flex flex-col h-full">
+                                        {/* EP1 / EP2 파이프라인 상태 */}
+                                        <div className="flex gap-3 mb-4">
+                                            <div className={`text-[9px] mono px-3 py-1 rounded-full font-bold border ${
+                                                state.ep1Status === 'done' ? 'border-emerald-500 text-emerald-400 bg-emerald-900/30' :
+                                                state.ep1Status === 'loading' ? 'border-amber-500 text-amber-400 bg-amber-900/30 animate-pulse' :
+                                                state.ep1Status === 'error' ? 'border-red-500 text-red-400 bg-red-900/30' :
+                                                'border-zinc-700 text-zinc-500'
+                                            }`}>
+                                                EP1 PROGRAM TREE {state.ep1Status === 'loading' ? '...' : state.ep1Status.toUpperCase()}
+                                            </div>
+                                            <div className={`text-[9px] mono px-3 py-1 rounded-full font-bold border ${
+                                                state.ep2Status === 'done' ? 'border-emerald-500 text-emerald-400 bg-emerald-900/30' :
+                                                state.ep2Status === 'loading' ? 'border-amber-500 text-amber-400 bg-amber-900/30 animate-pulse' :
+                                                state.ep2Status === 'error' ? 'border-red-500 text-red-400 bg-red-900/30' :
+                                                'border-zinc-700 text-zinc-500'
+                                            }`}>
+                                                EP2 VOID ENGINE {state.ep2Status === 'loading' ? '...' : state.ep2Status.toUpperCase()}
+                                            </div>
+                                            {state.grammarResult?.program_tree && (
+                                                <div className="text-[9px] mono px-3 py-1 text-zinc-400">
+                                                    {state.grammarResult.program_tree.spaces.length} spaces · {state.grammarResult.program_tree.clusters.length} clusters
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="flex justify-between items-center mb-4">
                                             <div className="text-[10px] mono text-zinc-500 uppercase">Blueprint IR JSON</div>
                                             <div className="flex gap-2">

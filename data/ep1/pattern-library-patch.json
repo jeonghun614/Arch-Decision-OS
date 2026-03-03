@@ -1,0 +1,80 @@
+{
+  "schema": {
+    "name": "pattern_library_patch",
+    "version": "1.0.0",
+    "description": "Add conflicts and exclusivity tags to pattern_blocks for Pattern Composition Engine."
+  },
+
+  "patches": [
+    {
+      "pattern_id": "ORG_CORE_PERIMETER",
+      "add": {
+        "exclusivity_tag": "ORG_GLOBAL_ORGANIZATION",
+        "conflicts": {
+          "hard": ["ORG_DISTRIBUTED_CLUSTERS"],
+          "soft": []
+        }
+      }
+    },
+    {
+      "pattern_id": "ORG_DISTRIBUTED_CLUSTERS",
+      "add": {
+        "exclusivity_tag": "ORG_GLOBAL_ORGANIZATION",
+        "conflicts": {
+          "hard": ["ORG_CORE_PERIMETER"],
+          "soft": []
+        }
+      }
+    },
+    {
+      "pattern_id": "CIRC_LOOP",
+      "add": {
+        "exclusivity_tag": "CIRC_PRIMARY_STRATEGY",
+        "conflicts": {
+          "hard": [],
+          "soft": ["CIRC_DUAL_LAYER"]
+        }
+      }
+    },
+    {
+      "pattern_id": "CIRC_DUAL_LAYER",
+      "add": {
+        "exclusivity_tag": "CIRC_PRIMARY_STRATEGY",
+        "conflicts": {
+          "hard": [],
+          "soft": ["CIRC_LOOP"]
+        }
+      }
+    },
+    {
+      "pattern_id": "SEP_PUBLIC_CONTROLLED_RESTRICTED",
+      "add": {
+        "exclusivity_tag": "SEP_ACCESS_HIERARCHY",
+        "conflicts": {
+          "hard": [],
+          "soft": []
+        }
+      }
+    },
+    {
+      "pattern_id": "VOID_ATRIUM_CANDIDATE",
+      "add": {
+        "exclusivity_tag": "VOID_PRIMARY",
+        "conflicts": {
+          "hard": ["VOID_COURTYARD_CANDIDATE"],
+          "soft": []
+        }
+      }
+    },
+    {
+      "pattern_id": "VOID_COURTYARD_CANDIDATE",
+      "add": {
+        "exclusivity_tag": "VOID_PRIMARY",
+        "conflicts": {
+          "hard": ["VOID_ATRIUM_CANDIDATE"],
+          "soft": []
+        }
+      }
+    }
+  ]
+}

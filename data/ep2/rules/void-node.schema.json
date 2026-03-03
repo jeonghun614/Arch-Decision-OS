@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "arch-decision/adss/void-node.schema.json",
+  "title": "VoidNode",
+  "type": "object",
+  "additionalProperties": false,
+  "x-ep1-contract": {
+    "access": "READ_ONLY",
+    "required_from_ep1": ["space_id", "category_label", "cluster_id", "placement.floor_preference.preferred", "placement.span"],
+    "ep2_outputs": ["footprint_adjustments", "relation_modifiers"],
+    "note": "EP2는 EP1 Program Tree를 수정하지 않는다. VoidNode effects는 footprint_adjustments와 relation_modifiers 로그로만 출력된다."
+  },
+  "required": ["void_id", "void_type", "span", "footprint", "anchors", "effects"],
+
+  "properties": {
+    "void_id": {
+      "type": "string",
+      "pattern": "^VOID-[0-9]{3,}$",
+      "description": "Unique id, e.g. VOID-001"
+    },
+
+    "void_type": {
+      "type": "string",
+      "enum": [
+        "COURTYARD_VOID",
+        "ATRIUM",
+        "DOUBLE_HEIGHT",
+        "INDUSTRIAL_HIGH_BAY",
+        "RAMP_CONTINUUM",
+        "LIGHT_WELL",
+        "MEZZANINE_OVERLAP"
+      ]
+    },
+
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_floor", "end_floor"],
+      "properties": {
+        "start_floor": { "type": "integer", "minimum": 1 },
+        "end_floor": { "type": "integer", "minimum": 1 },
+        "span_count": { "type": "integer", "minimum": 1, "description": "Derived: end_floor − start_floor + 1. Written by engine after computation; do not set manually." }
+      },
+      "description": "Floor span. start_floor/end_floor are required; span_count is derived by engine."
+    },
+
+    "footprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "value", "counts_as_gfa"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["RATIO", "AREA_M2", "BY_SPACE_SET"] },
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "counts_as_gfa": { "type": "boolean" },
+        "per_floor_override": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["floor", "mode", "value"],
+            "properties": {
+              "floor": { "type": "integer", "minimum": 1 },
+              "mode": { "type": "string", "enum": ["RATIO", "AREA_M2"] },
+              "value": { "type": "number", "exclusiveMinimum": 0 }
+            }
+          }
+        }
+      }
+    },
+
+    "anchors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anchor_spaces"],
+      "properties": {
+        "anchor_spaces": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": { "type": "string" },
+          "description": "Void 주변 공간 ID. 최대 20개 제한 — radius_hops와 조합 시 pair 수 기하급수 증가 방지."
+        },
+        "anchor_clusters": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "apply_scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "radius_hops": { "type": "integer", "minimum": 0, "maximum": 3 },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["PRIMARY", "PRIVATE", "SHARED", "SERVICE", "BUFFER", "CIRCULATION", "VOID"]
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vertical_visibility", "adjacency_modifier"],
+      "properties": {
+        "vertical_visibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "weight", "multiplier"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "weight": { "type": "number", "minimum": 0, "maximum": 5 },
+            "multiplier": { "type": "number", "minimum": 0, "maximum": 5 },
+            "floor_gap_factor": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.8, "description": "층 gap당 감쇠율. decay = floor_gap_factor ^ abs(floor_A − floor_B). multiplier 적용 전 사용." },
+            "apply_between": {
+              "type": "string",
+              "enum": ["SPACES_SHARING_SAME_VOID", "ANCHOR_AND_NEIGHBORS"]
+            },
+            "cap": { "type": "number", "minimum": 0, "maximum": 5, "description": "최종 score 상한. EP1 relation score 최대값(+5)에 정렬." }
+          }
+        },
+
+        "adjacency_modifier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "delta_V", "delta_A"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "delta_V": { "type": "number", "minimum": -5, "maximum": 5, "description": "EP1 relation score 범위 [-5, +5]에 정렬." },
+            "delta_A": { "type": "number", "minimum": -5, "maximum": 5, "description": "EP1 relation score 범위 [-5, +5]에 정렬." },
+            "score_cap": { "type": "number", "minimum": 0, "maximum": 5, "default": 2.0, "description": "pair당 최대 절대값 delta. EP1 score 범위 오버플로우 방지." },
+            "scope": {
+              "type": "string",
+              "enum": ["ANCHOR_ONLY", "ANCHOR_AND_NEIGHBORS", "ALL_IN_SPAN"]
+            },
+            "radius_hops": { "type": "integer", "minimum": 0, "maximum": 3 }
+          }
+        },
+
+        "circulation_modifier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "delta"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "delta": { "type": "number", "minimum": -5, "maximum": 5, "description": "EP1 relation score 범위 [-5, +5]에 정렬." }
+          }
+        },
+        "pattern_multiplier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3.0,
+          "default": 1.0,
+          "description": "EP1 선택 패턴에 따른 전체 effect 배율. cap/clamp 이전 적용. 예: VOID_ATRIUM_CANDIDATE → 1.2."
+        }
+      }
+    },
+
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "span_band": { "type": "boolean" },
+        "shade": { "type": "string", "enum": ["VOID", "PARTIAL_VOID", "NONE"] },
+        "note": { "type": "string" }
+      }
+    },
+
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string", "enum": ["AUTO", "USER", "RULE"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

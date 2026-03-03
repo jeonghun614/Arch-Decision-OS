@@ -1,0 +1,262 @@
+{
+  "schema": {
+    "name": "relation_auto_generation_rules",
+    "version": "1.0.0",
+    "description": "Generate space-space relation graph edges from spaces + clusters + domain_vector + selected_patterns."
+  },
+
+  "relation_types": ["ADJACENT", "NEAR", "SEPARATE", "VERTICAL_SEPARATE", "BUFFER_REQUIRED", "DIRECT_ACCESS"],
+
+  "scoring_scale": {
+    "min": -5,
+    "max": 5,
+    "meaning": {
+      "-5": "must be separated",
+      "-3": "prefer separated",
+      "0": "no preference",
+      "3": "prefer near",
+      "5": "must be adjacent/direct"
+    }
+  },
+
+  "inputs_expected": {
+    "spaces_fields_minimum": ["id", "name", "category_label", "space_type", "cluster_id", "area"],
+    "optional_fields": ["tags", "floor_hint", "access_level", "cleanliness", "noise_level"]
+  },
+
+  "generation_pipeline": [
+    "seed_core_edges",
+    "apply_cluster_relation_seeds",
+    "apply_category_matrix",
+    "apply_domain_overrides",
+    "apply_pattern_overrides",
+    "compress_edges_keep_top_k",
+    "derive_floor_group_hints",
+    "emit_graph"
+  ],
+
+  "seed_core_edges": {
+    "space_type_roles": {
+      "ENTRY": ["LOBBY", "RECEPTION", "VESTIBULE"],
+      "VERTICAL_CORE": ["STAIR", "ELEVATOR_CORE"],
+      "MAIN_CIRC": ["CORRIDOR", "HALLWAY", "GALLERY_CIRCULATION"],
+      "SERVICE_BACK": ["MEP_ROOM", "MEP_SHAFT", "STORAGE", "JANITOR"],
+      "TOILET": ["TOILET"]
+    },
+
+    "rules": [
+      {
+        "if_role_pair": ["ENTRY", "MAIN_CIRC"],
+        "relation_type": "DIRECT_ACCESS",
+        "score": 5,
+        "reason": "Entry must connect to main circulation"
+      },
+      {
+        "if_role_pair": ["VERTICAL_CORE", "MAIN_CIRC"],
+        "relation_type": "DIRECT_ACCESS",
+        "score": 5,
+        "reason": "Vertical core must connect to circulation"
+      },
+      {
+        "if_role_pair": ["SERVICE_BACK", "VERTICAL_CORE"],
+        "relation_type": "NEAR",
+        "score": 3,
+        "reason": "Service spaces should be near shafts/cores"
+      },
+      {
+        "if_role_pair": ["TOILET", "MAIN_CIRC"],
+        "relation_type": "NEAR",
+        "score": 3,
+        "reason": "Toilets should be accessible from circulation"
+      }
+    ]
+  },
+
+  "cluster_relation_seeds": {
+    "description": "선택된 패턴들의 relation_actions(A_target/V_target 형식)를 엔진 score(-5..+5) + relation_type으로 변환하여 클러스터→공간 레벨 엣지를 생성한다. Pattern Library와 이 엔진의 포맷 불일치를 해소하는 브릿지 레이어.",
+    "source": "selected_patterns[*].relation_actions",
+    "conversion": {
+      "default_relations": {
+        "score_formula": "min(round(min(A_target + V_target, 5) * weight), 5)",
+        "score_formula_note": "A_target(0–5) + V_target(0–4) 합산 후 5로 클램프, weight(0–1)로 스케일. 예) A=4,V=1,w=1.0 → 5 / A=3,V=2,w=0.8 → 4 / A=4,V=2,w=0.7 → 3",
+        "relation_type_mapping": [
+          { "if_final_score_gte": 5, "relation_type": "DIRECT_ACCESS" },
+          { "if_final_score_gte": 4, "relation_type": "ADJACENT" },
+          { "if_final_score_gte": 2, "relation_type": "NEAR" },
+          { "else": "NEAR" }
+        ]
+      },
+      "avoid_relations": {
+        "score_formula": "max(round(-5 * weight), -5)",
+        "score_formula_note": "회피 엣지는 항상 강한 음수. weight가 신뢰도를 스케일. 예) w=1.0 → -5 / w=0.8 → -4 / w=0.6 → -3",
+        "relation_type_mapping": [
+          { "if_final_score_lte": -4, "relation_type": "SEPARATE" },
+          { "if_final_score_lte": -2, "relation_type": "BUFFER_REQUIRED" },
+          { "else": "BUFFER_REQUIRED" }
+        ]
+      }
+    },
+    "expansion_scope": {
+      "from_cluster_to_spaces": "from_cluster 또는 from_category에 속하는 모든 공간",
+      "to_cluster_to_spaces": "to_cluster 또는 to_category에 속하는 모든 공간",
+      "score_inheritance": "변환된 score와 relation_type을 공간 쌍 전체에 상속",
+      "note": "공간 수가 많을 경우 edge_compression 단계에서 top-k로 필터링됨"
+    }
+  },
+
+  "category_matrix": {
+    "default_relation_type": "NEAR",
+    "pairs": [
+      { "a": "PRIMARY", "b": "CIRCULATION", "score": 4, "relation_type": "DIRECT_ACCESS" },
+      { "a": "SHARED", "b": "CIRCULATION", "score": 4, "relation_type": "DIRECT_ACCESS" },
+      { "a": "SERVICE", "b": "CIRCULATION", "score": 2, "relation_type": "NEAR" },
+      { "a": "SERVICE", "b": "SERVICE", "score": 3, "relation_type": "NEAR" },
+
+      { "a": "PRIVATE", "b": "PUBLIC", "score": -3, "relation_type": "SEPARATE" },
+      { "a": "PRIVATE", "b": "SHARED", "score": -1, "relation_type": "NEAR" },
+
+      { "a": "BUFFER", "b": "PRIVATE", "score": 2, "relation_type": "NEAR" },
+      { "a": "BUFFER", "b": "PUBLIC", "score": 2, "relation_type": "NEAR" },
+
+      { "a": "VOID", "b": "SHARED", "score": 2, "relation_type": "NEAR" },
+      { "a": "VOID", "b": "CIRCULATION", "score": 2, "relation_type": "NEAR" }
+    ],
+    "category_alias": {
+      "PUBLIC": "SHARED"
+    }
+  },
+
+  "domain_overrides": {
+    "HEALTHCARE": {
+      "rules": [
+        {
+          "if_space_tags_include": ["CLEAN", "DIRTY"],
+          "relation_type": "SEPARATE",
+          "score": -5,
+          "reason": "Clean/Dirty separation"
+        },
+        {
+          "if_space_type_pair": ["OPERATING_ROOM", "STERILE_STORAGE"],
+          "relation_type": "ADJACENT",
+          "score": 5,
+          "reason": "OR needs sterile support"
+        }
+      ]
+    },
+
+    "EDUCATION": {
+      "rules": [
+        {
+          "if_space_type_pair": ["CLASSROOM", "TOILET"],
+          "relation_type": "NEAR",
+          "score": 3,
+          "reason": "Classroom near toilet"
+        }
+      ]
+    },
+
+    "RETAIL": {
+      "rules": [
+        {
+          "if_space_type_pair": ["SALES_FLOOR", "STORAGE"],
+          "relation_type": "DIRECT_ACCESS",
+          "score": 4,
+          "reason": "Sales must connect to back-of-house storage"
+        }
+      ]
+    }
+  },
+
+  "pattern_overrides": {
+    "CIRC_LOOP": {
+      "rules": [
+        {
+          "target_categories": ["SHARED", "PRIMARY"],
+          "relation_type": "NEAR",
+          "score": 2,
+          "reason": "Loop circulation encourages adjacency among public-facing spaces"
+        }
+      ]
+    },
+
+    "SEP_PUBLIC_CONTROLLED_RESTRICTED": {
+      "rules": [
+        {
+          "if_access_level_pair": ["PUBLIC", "RESTRICTED"],
+          "relation_type": "SEPARATE",
+          "score": -5,
+          "reason": "Access hierarchy separation"
+        },
+        {
+          "if_access_level_pair": ["PUBLIC", "CONTROLLED"],
+          "relation_type": "BUFFER_REQUIRED",
+          "score": -3,
+          "reason": "Buffer zone recommended between public and controlled"
+        }
+      ]
+    },
+
+    "VOID_ATRIUM_CANDIDATE": {
+      "rules": [
+        {
+          "target_space_types": ["LOBBY", "GALLERY", "SALES_FLOOR"],
+          "relation_type": "NEAR",
+          "score": 3,
+          "reason": "Atrium supports visual/collective hub near public primary spaces"
+        }
+      ]
+    },
+
+    "VOID_COURTYARD_CANDIDATE": {
+      "rules": [
+        {
+          "target_categories": ["SHARED", "PRIMARY", "BUFFER"],
+          "relation_type": "NEAR",
+          "score": 2,
+          "reason": "Courtyard supports perimeter adjacency and buffered interfaces"
+        }
+      ]
+    }
+  },
+
+  "edge_compression": {
+    "keep_top_k_edges_per_space": 6,
+    "always_keep_relation_types": ["DIRECT_ACCESS", "BUFFER_REQUIRED", "VERTICAL_SEPARATE"],
+    "drop_below_abs_score": 1
+  },
+
+  "floor_grouping_hints": {
+    "derive_from_relations": true,
+    "rules": [
+      {
+        "if_relation_type": "SEPARATE",
+        "score_lte": -3,
+        "suggest": "different_floors_or_buffer"
+      },
+      {
+        "if_relation_type": "DIRECT_ACCESS",
+        "score_gte": 4,
+        "suggest": "same_floor_preferred"
+      }
+    ]
+  },
+
+  "output_contract": {
+    "graph": {
+      "nodes": [{ "space_id": "SP-001", "category_label": "PRIMARY" }],
+      "edges": [
+        {
+          "from": "SP-001",
+          "to": "SP-002",
+          "relation_type": "DIRECT_ACCESS",
+          "score": 4,
+          "reason": "PRIMARY↔CIRCULATION"
+        }
+      ]
+    },
+    "summary": {
+      "edge_count": 0,
+      "kept_top_k": 6
+    }
+  }
+}

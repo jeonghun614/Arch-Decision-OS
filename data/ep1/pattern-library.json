@@ -1,0 +1,658 @@
+{
+  "schema": {
+    "name": "universal_pattern_library",
+    "version": "1.0.0",
+    "description": "Pattern blocks for generating Program Tree (Category→Cluster→Space) and Relations Graph. Typology is not fixed; patterns are composed."
+  },
+
+  "enums": {
+    "category_labels": ["PRIMARY", "PRIVATE", "SHARED", "BUFFER", "SERVICE", "CIRCULATION", "VOID"],
+    "access_levels": ["OPEN", "CONTROLLED", "RESTRICTED"],
+    "visibility_levels": [0, 1, 2, 3, 4],
+    "operating_hours": ["STATIC", "SCHEDULED", "EVENT", "CONTINUOUS_24H"],
+    "span_types": ["SINGLE_FLOOR", "MULTI_LEVEL"]
+  },
+
+  "rules": {
+    "composition": {
+      "max_patterns": 6,
+      "min_patterns": 2,
+      "conflict_handling": "SOFT_WARN",
+      "priority_order": [
+        "SEPARATION",
+        "ORGANIZATION",
+        "CIRCULATION",
+        "PUBLICNESS",
+        "SPACE_KITS",
+        "VOID"
+      ]
+    },
+    "area_distribution": {
+      "category_total_source": "grammar.program.base_ratios",
+      "space_min_area_enforcement": true,
+      "rounding_m2": 1,
+      "max_total_error_percent": 2.0
+    },
+    "relations": {
+      "relation_formula": "R = A + V",
+      "relation_formula_note": "A_target (0–5): adjacency/access desire. V_target (0–4): visibility desire. 이 파일의 relation_actions는 클러스터 레벨 의미 표현이며, 실제 엔진 score(-5..+5) 및 relation_type으로의 변환은 relation_auto_generation_rules § cluster_relation_seeds.conversion 에서 정의됨.",
+      "vertical_visibility_enabled": true,
+      "default_vertical_weight": 0.6
+    }
+  },
+
+  "pattern_blocks": [
+    {
+      "id": "ORG_CORE_PERIMETER",
+      "family": "ORGANIZATION",
+      "label": "Core + Perimeter",
+      "intent": "Stabilize services/vertical circulation in a core; allocate program around perimeter for daylight & legibility.",
+      "triggers": {
+        "domain_bias": ["OFFICE", "EDUCATION", "HEALTHCARE", "RETAIL", "MIXED"],
+        "spatial_intensity": ["CELLULAR", "HYBRID"],
+        "vertical_intensity": ["MODERATE", "HIGH"]
+      },
+      "program_actions": {
+        "cluster_templates": [
+          {
+            "cluster_name": "Vertical & Service Core",
+            "category_label": "SERVICE",
+            "weight": 0.18,
+            "space_kits": ["KIT_VERTICAL_CORE", "KIT_MEP_SHAFTS"]
+          },
+          {
+            "cluster_name": "Perimeter Program Band",
+            "category_label": "PRIMARY",
+            "weight": 0.55,
+            "space_kits": ["KIT_GENERIC_PRIMARY_CELLULAR"]
+          },
+          {
+            "cluster_name": "Public Interface Strip",
+            "category_label": "SHARED",
+            "weight": 0.12,
+            "space_kits": ["KIT_ENTRY_LOBBY_RECEPTION"]
+          },
+          {
+            "cluster_name": "Circulation Network",
+            "category_label": "CIRCULATION",
+            "weight": 0.15,
+            "space_kits": ["KIT_CORRIDORS_STAIRS"]
+          }
+        ],
+        "placement_bias": {
+          "SERVICE": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 } },
+          "SHARED": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 2 } }
+        }
+      },
+      "relation_actions": {
+        "default_relations": [
+          { "from_cluster": "Vertical & Service Core", "to_cluster": "Perimeter Program Band", "A_target": 4, "V_target": 1, "weight": 1.0, "reason": "Core supports perimeter program." },
+          { "from_cluster": "Public Interface Strip", "to_cluster": "Perimeter Program Band", "A_target": 3, "V_target": 2, "weight": 0.8, "reason": "Public interface connects to primary." }
+        ],
+        "avoid_relations": [
+          { "from_cluster": "Public Interface Strip", "to_cluster": "Vertical & Service Core", "A_target": 1, "V_target": 0, "weight": 0.6, "reason": "Avoid exposing core/BOH." }
+        ]
+      }
+    },
+
+    {
+      "id": "ORG_DISTRIBUTED_CLUSTERS",
+      "family": "ORGANIZATION",
+      "label": "Distributed Clusters",
+      "intent": "Split program into multiple clusters to reduce forced encounter and increase parallel use.",
+      "triggers": {
+        "domain_bias": ["CAMPUS", "RESIDENTIAL", "CULTURAL", "RESEARCH", "MIXED"],
+        "spatial_intensity": ["CELLULAR", "HYBRID"],
+        "vertical_intensity": ["LOW", "MODERATE"]
+      },
+      "program_actions": {
+        "global_overrides": {
+          "centrality_hint": "DISTRIBUTED"
+        },
+        "cluster_templates": [
+          { "cluster_name": "Primary Cluster A", "category_label": "PRIMARY", "weight": 0.32, "space_kits": ["KIT_GENERIC_PRIMARY_CELLULAR"] },
+          { "cluster_name": "Primary Cluster B", "category_label": "PRIMARY", "weight": 0.23, "space_kits": ["KIT_GENERIC_PRIMARY_CELLULAR"] },
+          { "cluster_name": "Shared Commons", "category_label": "SHARED", "weight": 0.15, "space_kits": ["KIT_COMMONS"] },
+          { "cluster_name": "Buffers & Thresholds", "category_label": "BUFFER", "weight": 0.10, "space_kits": ["KIT_BUFFERS_THRESHOLDS"] },
+          { "cluster_name": "Service Support", "category_label": "SERVICE", "weight": 0.10, "space_kits": ["KIT_MEP_GENERAL", "KIT_STORAGE_GENERAL"] },
+          { "cluster_name": "Circulation Links", "category_label": "CIRCULATION", "weight": 0.10, "space_kits": ["KIT_LINKS_PATHS"] }
+        ],
+        "placement_bias": {
+          "BUFFER": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 999 } }
+        }
+      },
+      "relation_actions": {
+        "default_relations": [
+          { "from_cluster": "Shared Commons", "to_cluster": "Primary Cluster A", "A_target": 3, "V_target": 2, "weight": 1.0, "reason": "Commons supports primary." },
+          { "from_cluster": "Shared Commons", "to_cluster": "Primary Cluster B", "A_target": 3, "V_target": 2, "weight": 1.0, "reason": "Commons supports primary." },
+          { "from_cluster": "Buffers & Thresholds", "to_cluster": "Shared Commons", "A_target": 4, "V_target": 1, "weight": 0.8, "reason": "Buffer mediates shared space." }
+        ],
+        "avoid_relations": []
+      }
+    },
+
+    {
+      "id": "SEP_PUBLIC_CONTROLLED_RESTRICTED",
+      "family": "SEPARATION",
+      "label": "Public / Controlled / Restricted Hierarchy",
+      "intent": "Layer access to prevent unwanted exposure and enforce security gradient.",
+      "triggers": {
+        "security_level": ["CONTROLLED", "RESTRICTED"],
+        "publicness_level": ["SEMI_PUBLIC", "PUBLIC"]
+      },
+      "program_actions": {
+        "space_overrides": [
+          {
+            "match": { "category_label": "SHARED" },
+            "set": { "access_visibility": { "access_level": "OPEN", "visibility_level": 3 } }
+          },
+          {
+            "match": { "category_label": "PRIMARY" },
+            "set": { "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 2 } }
+          },
+          {
+            "match": { "category_label": "PRIVATE" },
+            "set": { "access_visibility": { "access_level": "RESTRICTED", "visibility_level": 1 } }
+          }
+        ],
+        "placement_bias": {
+          "SHARED": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 2 } },
+          "PRIVATE": { "floor_preference": { "preferred": [], "avoid": [1], "min_floor": 2, "max_floor": 999 } }
+        }
+      },
+      "relation_actions": {
+        "default_relations": [],
+        "avoid_relations": [
+          { "from_category": "SHARED", "to_category": "PRIVATE", "A_target": 1, "V_target": 0, "weight": 1.0, "reason": "Avoid direct adjacency between public and private." }
+        ]
+      }
+    },
+
+    {
+      "id": "CIRC_LOOP",
+      "family": "CIRCULATION",
+      "label": "Loop Circulation",
+      "intent": "Enable continuous movement and distribute encounters; good for galleries, campuses, commons, courtyards.",
+      "triggers": {
+        "circulation_hint": ["LOOP"],
+        "spatial_intensity": ["HYBRID", "LARGE_SPAN"]
+      },
+      "program_actions": {
+        "cluster_templates_append": [
+          { "cluster_name": "Loop Spine", "category_label": "CIRCULATION", "weight": 0.08, "space_kits": ["KIT_LOOP_SPINE"] }
+        ]
+      },
+      "relation_actions": {
+        "default_relations": [
+          { "from_cluster": "Loop Spine", "to_category": "PRIMARY", "A_target": 4, "V_target": 1, "weight": 0.8, "reason": "Loop supports primary navigation." },
+          { "from_cluster": "Loop Spine", "to_category": "SHARED", "A_target": 3, "V_target": 2, "weight": 0.8, "reason": "Loop connects shared nodes." }
+        ],
+        "avoid_relations": []
+      }
+    },
+
+    {
+      "id": "CIRC_DUAL_LAYER",
+      "family": "CIRCULATION",
+      "label": "Dual-layer Circulation",
+      "intent": "Separate resident/staff/back-of-house circulation from public circulation to reduce interference.",
+      "triggers": {
+        "operational_complexity": ["SCHEDULED", "CONTINUOUS_24H"],
+        "security_level": ["CONTROLLED", "RESTRICTED"]
+      },
+      "program_actions": {
+        "cluster_templates_append": [
+          { "cluster_name": "Back-of-House Circulation", "category_label": "CIRCULATION", "weight": 0.07, "space_kits": ["KIT_BACK_OF_HOUSE_PATHS"] }
+        ],
+        "space_overrides": [
+          {
+            "match": { "cluster_name": "Back-of-House Circulation" },
+            "set": { "access_visibility": { "access_level": "RESTRICTED", "visibility_level": 0 } }
+          }
+        ]
+      },
+      "relation_actions": {
+        "default_relations": [
+          { "from_cluster": "Back-of-House Circulation", "to_category": "SERVICE", "A_target": 5, "V_target": 0, "weight": 1.0, "reason": "BOH must strongly connect to service." }
+        ],
+        "avoid_relations": []
+      }
+    },
+
+    {
+      "id": "VOID_ATRIUM_CANDIDATE",
+      "family": "VOID",
+      "label": "Atrium Candidate",
+      "intent": "Introduce multi-level void to enhance orientation, daylight, and vertical visibility connections.",
+      "triggers": {
+        "vertical_intensity": ["MODERATE", "HIGH"],
+        "publicness_level": ["SEMI_PUBLIC", "PUBLIC"]
+      },
+      "program_actions": {
+        "void_suggestions": [
+          {
+            "name": "Atrium",
+            "void_type": "ATRIUM",
+            "default_span": { "from_floor": 1, "to_floor": 2 },
+            "area_effect": { "subtract_footprint_ratio_per_floor": 1.0 },
+            "relation_effect": { "visibility_multiplier": 1.2 }
+          }
+        ]
+      },
+      "relation_actions": {
+        "default_relations": [],
+        "avoid_relations": []
+      }
+    },
+
+    {
+      "id": "VOID_COURTYARD_CANDIDATE",
+      "family": "VOID",
+      "label": "Courtyard Void Candidate",
+      "intent": "Introduce courtyard void for buffering, daylight, and loop organization; compatible with courtyard topology.",
+      "triggers": {
+        "topology_hint": ["COURTYARD"],
+        "separation_hint": ["BUFFERED"]
+      },
+      "program_actions": {
+        "void_suggestions": [
+          {
+            "name": "Courtyard Void",
+            "void_type": "COURTYARD_VOID",
+            "default_span": { "from_floor": 1, "to_floor": 2 },
+            "area_effect": { "subtract_footprint_ratio_per_floor": 1.0 },
+            "relation_effect": { "visibility_multiplier": 1.15 }
+          }
+        ],
+        "cluster_templates_append": [
+          { "cluster_name": "Courtyard Buffer Ring", "category_label": "BUFFER", "weight": 0.06, "space_kits": ["KIT_COURTYARD_RING"] }
+        ]
+      },
+      "relation_actions": {
+        "default_relations": [
+          { "from_cluster": "Courtyard Buffer Ring", "to_category": "PRIMARY", "A_target": 4, "V_target": 2, "weight": 0.7, "reason": "Buffer ring mediates courtyard to primary." }
+        ],
+        "avoid_relations": []
+      }
+    }
+  ],
+
+  "space_kits": [
+    {
+      "id": "KIT_ENTRY_LOBBY_RECEPTION",
+      "description": "Generic entry interface kit usable across most building domains.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Lobby",
+            "space_type": "LOBBY",
+            "category_label": "SHARED",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 30, "max_each_m2": null, "min_total_m2": 30, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 1 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": "FRONT", "center_perimeter": "PERIMETER", "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "OPEN", "visibility_level": 3, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "MED", "ventilation_need": "MED", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "SCHEDULED", "staff_only": false, "public_facing": true, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["entry"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.18, "area_each_default_m2": 60 }
+        },
+        {
+          "template": {
+            "name": "Reception / Info",
+            "space_type": "RECEPTION",
+            "category_label": "SHARED",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 8, "max_each_m2": null, "min_total_m2": 8, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 1 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": "FRONT", "center_perimeter": "PERIMETER", "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "OPEN", "visibility_level": 3, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "LOW", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "SCHEDULED", "staff_only": true, "public_facing": true, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": ["Lobby"], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["entry"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.06, "area_each_default_m2": 12 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_VERTICAL_CORE",
+      "description": "Generic vertical connectors and service core placeholders.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Stair",
+            "space_type": "STAIR",
+            "category_label": "CIRCULATION",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 12, "max_each_m2": null, "min_total_m2": 12, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "MULTI_LEVEL", "from_floor": 1, "to_floor": 999 }, "zoning_hint": { "front_back": null, "center_perimeter": "CENTER", "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 1, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "MED", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": true, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["vertical"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.15, "area_each_default_m2": 18 }
+        },
+        {
+          "template": {
+            "name": "Elevator",
+            "space_type": "ELEVATOR",
+            "category_label": "CIRCULATION",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 6, "max_each_m2": null, "min_total_m2": 6, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "MULTI_LEVEL", "from_floor": 1, "to_floor": 999 }, "zoning_hint": { "front_back": null, "center_perimeter": "CENTER", "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 0, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "LOW", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": true, "equipment_heat": "LOW", "power_demand": "MED" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["vertical"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.10, "area_each_default_m2": 8 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_GENERIC_PRIMARY_CELLULAR",
+      "description": "Generic cellular primary space placeholders; later replaced by domain-specific kits.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Primary Room (Cell)",
+            "space_type": "PRIMARY_CELL",
+            "category_label": "PRIMARY",
+            "quantity": 6,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 12, "max_each_m2": null, "min_total_m2": 72, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": "PERIMETER", "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 2, "acoustic_sensitivity": "MED", "privacy_level": "MED" },
+            "performance": { "daylight_need": "MED", "ventilation_need": "MED", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "SCHEDULED", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["primary", "cellular"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 18 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_CORRIDORS_STAIRS",
+      "description": "Generic horizontal circulation placeholders.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Corridor",
+            "space_type": "CORRIDOR",
+            "category_label": "CIRCULATION",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 20, "max_each_m2": null, "min_total_m2": 20, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 1, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "MED", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["circulation"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.55, "area_each_default_m2": 60 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_COMMONS",
+      "description": "Generic shared commons kit (multi-purpose).",
+      "spaces": [
+        {
+          "template": {
+            "name": "Commons / Lounge",
+            "space_type": "COMMONS",
+            "category_label": "SHARED",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 25, "max_each_m2": null, "min_total_m2": 25, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 3 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": null, "quiet_loud": "LOUD", "clean_dirty": null } },
+            "access_visibility": { "access_level": "OPEN", "visibility_level": 3, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "MED", "ventilation_need": "MED", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "SCHEDULED", "staff_only": false, "public_facing": true, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["shared"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 45 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_BUFFERS_THRESHOLDS",
+      "description": "Generic buffers, vestibules, thresholds, waiting zones.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Buffer / Threshold",
+            "space_type": "BUFFER",
+            "category_label": "BUFFER",
+            "quantity": 2,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 6, "max_each_m2": null, "min_total_m2": 12, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 1, "acoustic_sensitivity": "MED", "privacy_level": "MED" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "MED", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "SCHEDULED", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["buffer"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 8 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_LOOP_SPINE",
+      "description": "Loop corridor/spine placeholder.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Loop Spine Segment",
+            "space_type": "LOOP_SPINE",
+            "category_label": "CIRCULATION",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 25, "max_each_m2": null, "min_total_m2": 25, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 1, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "MED", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["loop"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 50 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_BACK_OF_HOUSE_PATHS",
+      "description": "Restricted circulation for staff/service.",
+      "spaces": [
+        {
+          "template": {
+            "name": "BOH Corridor",
+            "space_type": "BOH_CORRIDOR",
+            "category_label": "CIRCULATION",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 15, "max_each_m2": null, "min_total_m2": 15, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": "BACK", "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "RESTRICTED", "visibility_level": 0, "acoustic_sensitivity": "LOW", "privacy_level": "HIGH" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "MED", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": true, "public_facing": false, "security_requirement": "RESTRICTED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["boh"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 30 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_MEP_SHAFTS",
+      "description": "MEP shafts and risers placeholders.",
+      "spaces": [
+        {
+          "template": {
+            "name": "MEP Shaft",
+            "space_type": "MEP_SHAFT",
+            "category_label": "SERVICE",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 4, "max_each_m2": null, "min_total_m2": 4, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "MULTI_LEVEL", "from_floor": 1, "to_floor": 999 }, "zoning_hint": { "front_back": null, "center_perimeter": "CENTER", "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "RESTRICTED", "visibility_level": 0, "acoustic_sensitivity": "LOW", "privacy_level": "HIGH" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "LOW", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": true, "public_facing": false, "security_requirement": "RESTRICTED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": true, "equipment_heat": "MED", "power_demand": "MED" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["mep"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.35, "area_each_default_m2": 6 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_MEP_GENERAL",
+      "description": "General service rooms placeholders.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Mechanical / Electrical Room",
+            "space_type": "MEP_ROOM",
+            "category_label": "SERVICE",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 12, "max_each_m2": null, "min_total_m2": 12, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": "BACK", "center_perimeter": null, "quiet_loud": "LOUD", "clean_dirty": null } },
+            "access_visibility": { "access_level": "RESTRICTED", "visibility_level": 0, "acoustic_sensitivity": "LOW", "privacy_level": "HIGH" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "MED", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": true, "public_facing": false, "security_requirement": "RESTRICTED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "MED", "power_demand": "MED" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["service"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.45, "area_each_default_m2": 20 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_STORAGE_GENERAL",
+      "description": "Generic storage spaces.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Storage",
+            "space_type": "STORAGE",
+            "category_label": "SERVICE",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 6, "max_each_m2": null, "min_total_m2": 6, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": "BACK", "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "RESTRICTED", "visibility_level": 0, "acoustic_sensitivity": "LOW", "privacy_level": "HIGH" },
+            "performance": { "daylight_need": "LOW", "ventilation_need": "LOW", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": true, "public_facing": false, "security_requirement": "RESTRICTED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["storage"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 0.20, "area_each_default_m2": 10 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_LINKS_PATHS",
+      "description": "Generic links and paths for distributed composition.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Link Path",
+            "space_type": "PATH",
+            "category_label": "CIRCULATION",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 12, "max_each_m2": null, "min_total_m2": 12, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 1, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+            "performance": { "daylight_need": "MED", "ventilation_need": "MED", "thermal_control_need": "LOW", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "CONTINUOUS_24H", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["link"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 20 }
+        }
+      ]
+    },
+
+    {
+      "id": "KIT_COURTYARD_RING",
+      "description": "Buffer ring around courtyard / lightwell.",
+      "spaces": [
+        {
+          "template": {
+            "name": "Courtyard Edge Buffer",
+            "space_type": "COURTYARD_EDGE",
+            "category_label": "BUFFER",
+            "quantity": 1,
+            "area": { "each_m2": 0, "total_m2": 0, "net_or_gross": "NET", "constraints": { "min_each_m2": 15, "max_each_m2": null, "min_total_m2": 15, "max_total_m2": null }, "efficiency_factor": 1.0 },
+            "placement": { "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }, "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 }, "zoning_hint": { "front_back": null, "center_perimeter": null, "quiet_loud": null, "clean_dirty": null } },
+            "access_visibility": { "access_level": "CONTROLLED", "visibility_level": 2, "acoustic_sensitivity": "MED", "privacy_level": "MED" },
+            "performance": { "daylight_need": "MED", "ventilation_need": "MED", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+            "operations": { "operating_hours": "SCHEDULED", "staff_only": false, "public_facing": false, "security_requirement": "CONTROLLED" },
+            "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+            "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+            "links": { "must_adjoin": [], "should_adjoin": [], "avoid_adjoin": [], "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] } },
+            "ui": { "display_tags": ["courtyard", "buffer"], "label_override": null, "color_hint": null },
+            "notes": ""
+          },
+          "scaling": { "area_total_ratio_of_category": 1.0, "area_each_default_m2": 25 }
+        }
+      ]
+    }
+	
+  ]
+}

@@ -1,0 +1,256 @@
+{
+  "schema": {
+    "name": "domain_vector_engine_rules",
+    "version": "1.0.1"
+  },
+
+  "signal_dictionary": {
+    "schema": { "name": "domain_vector_signal_dictionary", "version": "1.0.0" },
+
+    "signals": [
+      {
+        "id": "SIG_PUBLIC_CULTURE",
+        "match": {
+          "any_keywords": ["전시", "갤러리", "미술관", "박물관", "관람", "아트", "공연", "콘서트", "극장", "문화", "체험"]
+        },
+        "effects": {
+          "use_domain_scores": { "CULTURAL": 3, "RETAIL": 1 },
+          "publicness_score": 3,
+          "security_score": 0,
+          "operational_complexity_score": 1,
+          "spatial_intensity_score": 2,
+          "vertical_intensity_score": 1,
+          "circulation_hints": ["LOOP"]
+        },
+        "evidence": "문화/관람 프로그램 신호"
+      },
+      {
+        "id": "SIG_EDUCATION",
+        "match": { "any_keywords": ["학교", "교육", "수업", "강의", "교실", "학원", "캠퍼스", "도서관", "열람", "연구"] },
+        "effects": {
+          "use_domain_scores": { "EDUCATION": 3, "RESEARCH": 2 },
+          "publicness_score": 1,
+          "security_score": 1,
+          "operational_complexity_score": 2,
+          "spatial_intensity_score": 1,
+          "vertical_intensity_score": 1,
+          "separation_hints": ["LOUD_QUIET"]
+        },
+        "evidence": "교육/학습 프로그램 신호"
+      },
+      {
+        "id": "SIG_HEALTHCARE",
+        "match": { "any_keywords": ["병원", "진료", "수술", "응급", "중환자", "격리", "검사", "처치", "회복", "의료"] },
+        "effects": {
+          "use_domain_scores": { "HEALTHCARE": 4 },
+          "publicness_score": 1,
+          "security_score": 4,
+          "operational_complexity_score": 4,
+          "spatial_intensity_score": 2,
+          "vertical_intensity_score": 2,
+          "separation_hints": ["CLEAN_DIRTY", "PUBLIC_CONTROLLED"]
+        },
+        "evidence": "의료/격리/클린-더티 분리 신호"
+      },
+      {
+        "id": "SIG_INDUSTRIAL_LOGISTICS",
+        "match": { "any_keywords": ["공장", "제조", "라인", "생산", "조립", "물류", "하역", "적재", "창고", "배송", "피킹"] },
+        "effects": {
+          "use_domain_scores": { "INDUSTRIAL": 4, "LOGISTICS": 3 },
+          "publicness_score": 0,
+          "security_score": 3,
+          "operational_complexity_score": 3,
+          "spatial_intensity_score": 4,
+          "vertical_intensity_score": 1,
+          "circulation_hints": ["DUAL_LAYER"],
+          "separation_hints": ["PUBLIC_CONTROLLED"]
+        },
+        "evidence": "산업/물류/대공간/하역 신호"
+      },
+      {
+        "id": "SIG_OFFICE",
+        "match": { "any_keywords": ["오피스", "사무", "업무", "회의", "본사", "워크스페이스"] },
+        "effects": {
+          "use_domain_scores": { "OFFICE": 4 },
+          "publicness_score": 1,
+          "security_score": 2,
+          "operational_complexity_score": 2,
+          "spatial_intensity_score": 1,
+          "vertical_intensity_score": 2,
+          "organization_hints": ["CORE_PERIMETER"]
+        },
+        "evidence": "업무/사무 신호"
+      },
+      {
+        "id": "SIG_RETAIL_FNB",
+        "match": { "any_keywords": ["상업", "리테일", "매장", "샵", "쇼룸", "카페", "레스토랑", "푸드", "마켓", "팝업"] },
+        "effects": {
+          "use_domain_scores": { "RETAIL": 4 },
+          "publicness_score": 4,
+          "security_score": 1,
+          "operational_complexity_score": 2,
+          "spatial_intensity_score": 2,
+          "vertical_intensity_score": 1,
+          "circulation_hints": ["LOOP"]
+        },
+        "evidence": "상업/공공 접근/유입 신호"
+      },
+      {
+        "id": "SIG_RESIDENTIAL",
+        "match": { "any_keywords": ["주택", "주거", "아파트", "기숙사", "셰어하우스", "코리빙", "거주"] },
+        "effects": {
+          "use_domain_scores": { "RESIDENTIAL": 4 },
+          "publicness_score": 0,
+          "security_score": 2,
+          "operational_complexity_score": 1,
+          "spatial_intensity_score": 1,
+          "vertical_intensity_score": 1,
+          "separation_hints": ["PUBLIC_CONTROLLED", "LOUD_QUIET"]
+        },
+        "evidence": "주거/프라이버시 신호"
+      },
+      {
+        "id": "SIG_24H_CONTINUOUS",
+        "match": { "any_keywords": ["24시간", "상시", "야간", "연중무휴", "항상"] },
+        "effects": {
+          "operational_complexity_score": 4,
+          "operating_hours": "CONTINUOUS_24H",
+          "circulation_hints": ["DUAL_LAYER"]
+        },
+        "evidence": "상시 운영 신호"
+      },
+      {
+        "id": "SIG_EVENT_BASED",
+        "match": { "any_keywords": ["행사", "이벤트", "축제", "공연", "집회", "대회"] },
+        "effects": {
+          "use_domain_scores": { "CULTURAL": 2, "RETAIL": 1 },
+          "operational_complexity_score": 3,
+          "operating_hours": "EVENT",
+          "publicness_score": 3,
+          "spatial_intensity_score": 3,
+          "vertical_intensity_score": 2,
+          "void_hints": ["ATRIUM_CANDIDATE"]
+        },
+        "evidence": "이벤트 기반 운영 신호"
+      },
+      {
+        "id": "SIG_LARGE_SPAN_SPACE",
+        "match": { "any_keywords": ["대공간", "무주", "장스팬", "홀", "아레나", "체육관", "창고형"] },
+        "effects": {
+          "spatial_intensity_score": 4,
+          "vertical_intensity_score": 2,
+          "void_hints": ["ATRIUM_CANDIDATE"]
+        },
+        "evidence": "대공간/장스팬 신호"
+      },
+      {
+        "id": "SIG_COURTYARD_MENTION",
+        "match": { "any_keywords": ["중정", "코트야드", "마당", "내부마당", "빛마당"] },
+        "effects": {
+          "topology_hints": ["COURTYARD"],
+          "void_hints": ["COURTYARD_VOID_CANDIDATE"],
+          "circulation_hints": ["LOOP"],
+          "vertical_intensity_score": 1
+        },
+        "evidence": "중정/마당 신호"
+      },
+      {
+        "id": "SIG_HIGH_SECURITY",
+        "match": { "any_keywords": ["보안", "출입통제", "제한구역", "기밀", "통제", "검문"] },
+        "effects": {
+          "security_score": 4,
+          "separation_hints": ["PUBLIC_CONTROLLED"]
+        },
+        "evidence": "고보안/출입통제 신호"
+      }
+    ]
+  },
+
+  "scoring_rules": {
+    "schema": { "name": "domain_vector_scoring_rules", "version": "1.0.1" },
+
+    "thresholds": {
+      "publicness_level": [
+        { "if_score_gte": 7, "label": "PUBLIC" },
+        { "if_score_gte": 3, "label": "SEMI_PUBLIC" },
+        { "else": "PRIVATE" }
+      ],
+      "security_level": [
+        { "if_score_gte": 7, "label": "RESTRICTED" },
+        { "if_score_gte": 3, "label": "CONTROLLED" },
+        { "else": "LOW" }
+      ],
+      "operational_complexity": [
+        { "if_score_gte": 7, "label": "CONTINUOUS_24H" },
+        { "if_score_gte": 4, "label": "SCHEDULED" },
+        { "else": "SIMPLE" }
+      ],
+      "spatial_intensity": [
+        { "if_score_gte": 7, "label": "LARGE_SPAN" },
+        { "if_score_gte": 4, "label": "HYBRID" },
+        { "else": "CELLULAR" }
+      ],
+      "vertical_intensity": [
+        { "if_score_gte": 6, "label": "HIGH" },
+        { "if_score_gte": 3, "label": "MODERATE" },
+        { "else": "LOW" }
+      ]
+    },
+
+    "use_domain_ranking": {
+      "pick_top_n": 3,
+      "normalize_scores": true
+    },
+
+    "hint_selection": {
+      "circulation_hint": { "max_items": 2, "dedupe": true },
+      "topology_hint": { "max_items": 2, "dedupe": true },
+      "void_hint": { "max_items": 2, "dedupe": true },
+      "organization_hint": { "max_items": 2, "dedupe": true },
+      "separation_hints": { "max_items": 3, "dedupe": true }
+    },
+
+    "confidence_rules": {
+      "overall_confidence": {
+        "high_if": "top_domain_score_share_gte_0.55",
+        "medium_if": "top_domain_score_share_gte_0.35",
+        "else": "LOW"
+      }
+    }
+  },
+
+  "output_schema": {
+    "schema": { "name": "domain_vector_output", "version": "1.0.0" },
+
+    "domain_vector": {
+      "use_domains_ranked": [
+        { "domain": "CULTURAL", "score": 0.0 }
+      ],
+      "publicness_level": "PRIVATE",
+      "security_level": "LOW",
+      "operational_complexity": "SIMPLE",
+      "operating_hours": "SCHEDULED",
+      "spatial_intensity": "CELLULAR",
+      "vertical_intensity": "LOW",
+
+      "circulation_hint": [],
+      "topology_hint": [],
+      "void_hint": [],
+      "organization_hint": [],
+      "separation_hints": []
+    },
+
+    "evidence_log": [
+      {
+        "matched_signal_id": "SIG_RETAIL_FNB",
+        "keyword": "카페",
+        "effects_applied": ["publicness +4", "RETAIL +4", "LOOP hint"]
+      }
+    ],
+
+    "confidence": {
+      "overall": "MEDIUM",
+      "low_confidence_fields": []
+    }
+  }
+}

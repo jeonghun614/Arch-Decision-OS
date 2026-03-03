@@ -1,0 +1,150 @@
+{
+  "schema": {
+    "name": "pattern_composition_engine_rules",
+    "version": "1.0.1",
+    "description": "Rule-based engine to select and compose 2~6 patterns using Domain Vector + Pattern Library."
+  },
+
+  "data_dependencies": {
+    "pattern_library_source": "Pattern Library.json",
+    "required_patches": [
+      {
+        "file": "Pattern Library_patch.json",
+        "apply_before": "pattern_selection",
+        "merge_key": "pattern_id",
+        "merge_strategy": "deep_merge_add_fields",
+        "description": "각 pattern_block에 conflicts 및 exclusivity_tag를 병합. 이 패치 없이는 hard conflict 제거 및 exclusivity_tag 기반 중복 제거 불가."
+      }
+    ]
+  },
+
+  "selection_bounds": {
+    "min_patterns": 2,
+    "max_patterns": 6,
+    "min_family_coverage": ["ORGANIZATION", "CIRCULATION"],
+    "optional_families": ["SEPARATION", "PUBLICNESS", "SPACE_KITS", "VOID"],
+    "reserved_families": ["PUBLICNESS", "SPACE_KITS"],
+    "reserved_families_note": "PUBLICNESS, SPACE_KITS는 현재 Pattern Library에 해당 family 패턴 없음. 향후 확장 예정 슬롯이며, 현재는 선택 과정에서 매칭 대상 패턴이 없으므로 무시됨."
+  },
+
+  "priority_order": [
+    "SEPARATION",
+    "ORGANIZATION",
+    "CIRCULATION",
+    "PUBLICNESS",
+    "SPACE_KITS",
+    "VOID"
+  ],
+
+  "scoring": {
+    "thresholds": {
+      "min_candidate_score": 6,
+      "min_selected_score": 10,
+      "void_can_be_suggestion_below_min": true,
+      "void_suggestion_min_score": 6
+    },
+
+    "weights": {
+      "domain_bias_rank_points": { "rank1": 6, "rank2": 4, "rank3": 2 },
+      "label_match_points": 5,
+      "hint_match_points": 4,
+      "separation_hint_points_each": 3
+    },
+
+    "confidence_multiplier": {
+      "HIGH": 1.05,
+      "MEDIUM": 1.0,
+      "LOW": 0.95
+    },
+
+    "bonuses": {
+      "missing_required_family_boost": {
+        "ORGANIZATION": 5,
+        "CIRCULATION": 4
+      },
+      "perfect_trigger_match_bonus": 2
+    },
+
+    "penalties": {
+      "weak_match_penalty": 2,
+      "same_family_third_or_more_penalty": 4,
+      "soft_conflict_penalty": 5
+    }
+  },
+
+  "matching_rules": {
+    "domain_bias": {
+      "source": "domain_vector.use_domains_ranked",
+      "match_type": "includes_any",
+      "points_by_rank": "scoring.weights.domain_bias_rank_points"
+    },
+
+    "label_fields": [
+      "publicness_level",
+      "security_level",
+      "operational_complexity",
+      "spatial_intensity",
+      "vertical_intensity"
+    ],
+
+    "hint_fields": [
+      { "pattern_trigger_field": "circulation_hint", "vector_field": "circulation_hint" },
+      { "pattern_trigger_field": "topology_hint", "vector_field": "topology_hint" }
+    ],
+
+    "separation_hints": {
+      "pattern_trigger_field": "separation_hint",
+      "vector_field": "separation_hints",
+      "points_each": "scoring.weights.separation_hint_points_each"
+    },
+
+    "perfect_match_definition": {
+      "min_trigger_hits": 3,
+      "includes_domain_bias": true
+    }
+  },
+
+  "composition_rules": {
+    "exclusivity": {
+      "use_exclusivity_tag": true,
+      "strategy": "keep_highest_score_in_tag_group"
+    },
+
+    "conflicts": {
+      "hard": {
+        "strategy": "remove_lower_score",
+        "tie_breaker": "priority_order_first"
+      },
+      "soft": {
+        "strategy": "apply_penalty_and_rerank",
+        "penalty_points": "scoring.penalties.soft_conflict_penalty",
+        "drop_if_below_min_selected_score": true
+      }
+    },
+
+    "family_limits": {
+      "max_per_family": {
+        "SEPARATION": 2,
+        "ORGANIZATION": 1,
+        "CIRCULATION": 2,
+        "PUBLICNESS": 1,
+        "SPACE_KITS": 2,
+        "VOID": 1
+      },
+      "max_per_family_note": "PUBLICNESS, SPACE_KITS 슬롯은 reserved_families 참조. 현재 매칭 가능한 패턴 없음."
+    },
+
+    "fallbacks": {
+      "if_missing_required_family": {
+        "ORGANIZATION": "pick_best_scoring_organization",
+        "CIRCULATION": "pick_best_scoring_circulation"
+      }
+    }
+  },
+
+  "output_format": {
+    "include_scoring_breakdown": true,
+    "include_rejected_candidates": true,
+    "include_conflict_resolution_log": true
+  }
+}

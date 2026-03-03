@@ -159,6 +159,106 @@ export interface SpatialGrammar {
   [key: string]: any;
 }
 
+// ─────────────────────────────────────────────
+// EP1 Program Tree 타입
+// ─────────────────────────────────────────────
+
+export interface EP1Space {
+  id: string;                   // SP-XXXX
+  name: string;
+  space_type: string;
+  category_label: 'PRIMARY' | 'PRIVATE' | 'SHARED' | 'BUFFER' | 'SERVICE' | 'CIRCULATION' | 'VOID';
+  cluster_id: string;           // CLU-XXX
+  quantity: number;
+  area: {
+    each_m2: number;
+    total_m2: number;
+    net_or_gross: 'NET' | 'GROSS';
+  };
+  placement: {
+    floor_preference: { preferred: number[]; avoid: number[]; min_floor: number; max_floor: number };
+    span: { type: 'SINGLE_FLOOR' | 'MULTI_LEVEL'; from_floor: number; to_floor: number };
+  };
+}
+
+export interface EP1Cluster {
+  id: string;                   // CLU-XXX
+  name: string;
+  category_label: string;
+  weight: number;
+  space_kits: string[];
+}
+
+export interface EP1RelationEdge {
+  from: string;
+  to: string;
+  relation_type: string;
+  score: number;
+  reason?: string;
+}
+
+export interface EP1ProgramTree {
+  spaces: EP1Space[];
+  clusters: EP1Cluster[];
+  relations: {
+    graph: {
+      nodes: { space_id: string; category_label: string }[];
+      edges: EP1RelationEdge[];
+    };
+  };
+  selected_patterns: string[];
+  domain_vector: Record<string, any>;
+}
+
+// ─────────────────────────────────────────────
+// EP2 Void & 엔진 출력 타입
+// ─────────────────────────────────────────────
+
+export interface EP2VoidNode {
+  void_id: string;              // VOID-XXX
+  void_type: 'COURTYARD_VOID' | 'ATRIUM' | 'DOUBLE_HEIGHT' | 'INDUSTRIAL_HIGH_BAY' | 'RAMP_CONTINUUM' | 'LIGHT_WELL' | 'MEZZANINE_OVERLAP';
+  span: { start_floor: number; end_floor: number; span_count?: number };
+  footprint: { mode: 'RATIO' | 'AREA_M2' | 'BY_SPACE_SET'; value: number; counts_as_gfa: boolean };
+  anchors: { anchor_spaces: string[] };
+  effects: {
+    vertical_visibility: { enabled: boolean; weight: number; multiplier: number };
+    adjacency_modifier: { enabled: boolean; delta_V: number; delta_A: number };
+  };
+}
+
+export interface EP2FootprintAdjustment {
+  floor: number;
+  void_id: string;
+  void_type: string;
+  plate_area_m2: number;
+  deduct_area_m2: number;
+  remaining_usable_m2: number;
+  deduct_mode: string;
+  effective_value: number;
+  counts_as_gfa: boolean;
+}
+
+export interface EP2RelationModifier {
+  type: 'VERTICAL_VISIBILITY' | 'ADJACENCY_MODIFIER';
+  void_id: string;
+  from_space_id: string;
+  to_space_id: string;
+  delta_V_vertical?: number;
+  delta_A?: number;
+  delta_R?: number;
+  meta: Record<string, any>;
+}
+
+export interface EP2Output {
+  void_nodes: EP2VoidNode[];
+  footprint_adjustments: EP2FootprintAdjustment[];
+  relation_modifiers: EP2RelationModifier[];
+  usable_area_by_floor: Record<number, number | null>;
+  warnings: Array<{ void_id: string | null; floor?: number | null; code: string; message: string }>;
+}
+
+// ─────────────────────────────────────────────
+
 export interface BlueprintJSON {
   inputs: SiteInputs;
   logic_trace: {
@@ -194,6 +294,10 @@ export interface BlueprintJSON {
       massing: any[];
     };
   };
+  // EP1: 구체적 프로그램 트리 (Gemini + EP1 규칙으로 생성)
+  program_tree?: EP1ProgramTree;
+  // EP2: Void 효과 계산 결과 (JS 엔진으로 생성)
+  ep2?: EP2Output;
 }
 
 export interface ProjectState {
@@ -207,6 +311,8 @@ export interface ProjectState {
   completed: boolean;
   finalReport: FinalReport | null;
   grammarResult: BlueprintJSON | null;
+  ep1Status: 'idle' | 'loading' | 'done' | 'error';
+  ep2Status: 'idle' | 'loading' | 'done' | 'error';
 }
 
 export const CHECKPOINT_ORDER = [

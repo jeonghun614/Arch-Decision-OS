@@ -1,0 +1,175 @@
+{
+  "schema": {
+    "name": "span_floors_rules",
+    "version": "1.0.0",
+    "purpose": "Decide void span (start_floor/end_floor) from building context + void_type + intensity + patterns."
+  },
+
+  "ep1_contract": {
+    "access": "READ_ONLY",
+    "required_from_ep1": [
+      "domain_vector.vertical_intensity",
+      "selected_patterns",
+      "spaces[*].space_id",
+      "spaces[*].placement.floor_preference.preferred",
+      "spaces[*].placement.span"
+    ],
+    "ep2_outputs": ["footprint_adjustments", "relation_modifiers"],
+    "note": "이 엔진은 EP1 Program Tree를 수정하지 않는다. span 결정값은 VoidNode에 기록되며 EP1 Program Tree 구조(adjacency, layers, patterns)를 변경하지 않는다."
+  },
+
+  "inputs_expected": {
+    "building": {
+      "floors_total": "integer >= 1",
+      "has_basement": "boolean (optional)",
+      "ground_floor_index": "integer (default 1)"
+    },
+    "domain_vector": {
+      "vertical_intensity": "LOW | MODERATE | HIGH"
+    },
+    "selected_patterns": "string[] — EP1 pattern ID 목록. 빈 배열([]) 허용, 이 경우 pattern_span_adjustments 미적용.",
+    "ep1_spaces": {
+      "space_id": "string",
+      "floor": "integer — placement.floor_preference.preferred[0] 또는 min_floor로 resolve",
+      "note": "anchor_floor_hint 미제공 시 anchor_spaces의 floor를 fallback으로 사용. MULTI_LEVEL span은 from_floor ~ to_floor 전체 참여."
+    },
+    "void_candidate": {
+      "void_type": "COURTYARD_VOID | ATRIUM | DOUBLE_HEIGHT | INDUSTRIAL_HIGH_BAY | RAMP_CONTINUUM | LIGHT_WELL | MEZZANINE_OVERLAP",
+      "anchors": {
+        "anchor_space_ids": "string[]",
+        "anchor_floor_hint": "integer (optional)"
+      }
+    }
+  },
+
+  "global_policy": {
+    "default_start_floor": 1,
+    "max_span_cap_by_total_floors_ratio": 0.7,
+    "prefer_start_at_ground_for": ["ATRIUM", "DOUBLE_HEIGHT", "INDUSTRIAL_HIGH_BAY"],
+    "allow_mid_start_for": ["LIGHT_WELL", "MEZZANINE_OVERLAP"],
+    "clamp_to_building_floors": true
+  },
+
+  "base_span_by_vertical_intensity": {
+    "LOW": { "min": 1, "max": 2, "typ": 2 },
+    "MODERATE": { "min": 2, "max": 3, "typ": 3 },
+    "HIGH": { "min": 3, "max": 5, "typ": 4 }
+  },
+
+  "void_type_span_constraints": {
+    "COURTYARD_VOID": { "min": 1, "max": 2, "prefer_start_floor": 1 },
+    "ATRIUM": { "min": 2, "max": 4, "prefer_start_floor": 1 },
+    "DOUBLE_HEIGHT": { "min": 2, "max": 2, "prefer_start_floor": 1 },
+    "INDUSTRIAL_HIGH_BAY": { "min": 2, "max": 4, "prefer_start_floor": 1 },
+    "RAMP_CONTINUUM": { "min": 2, "max": 5, "prefer_start_floor": 1 },
+    "LIGHT_WELL": { "min": 2, "max": 999, "prefer_start_floor": 2 },
+    "MEZZANINE_OVERLAP": { "min": 2, "max": 3, "prefer_start_floor": 2 }
+  },
+
+  "pattern_span_adjustments": [
+    {
+      "if_any_patterns": ["ORG_CORE_PERIMETER"],
+      "pending_patterns": ["RADIAL_HALL", "PUBLIC_HALL"],
+      "pending_note": "EP1 Pattern Library 미등록. 추후 추가 시 if_any_patterns로 이동.",
+      "apply": { "delta_typ": 1 },
+      "reason": "central vertical space becomes legible and useful"
+    },
+    {
+      "if_any_patterns": [],
+      "pending_patterns": ["LINEAR_SPINE", "PRODUCTION_LINE"],
+      "pending_note": "EP1 Pattern Library 미등록. 추후 추가 시 if_any_patterns로 이동.",
+      "apply": { "delta_typ": -1 },
+      "reason": "linear organization tends to distribute instead of stacking around a big void"
+    },
+    {
+      "if_any_patterns": ["VOID_COURTYARD_CANDIDATE"],
+      "apply": { "force_void_types": ["COURTYARD_VOID"], "delta_typ": 0 },
+      "reason": "courtyard logic usually stabilizes at 1~2 floors"
+    },
+    {
+      "if_any_patterns": [],
+      "pending_patterns": ["RAMP_CONTINUUM"],
+      "pending_note": "EP1 Pattern Library 미등록. RAMP_CONTINUUM은 현재 void_type으로만 존재. 패턴 등록 시 이동.",
+      "apply": { "min_override": 3 },
+      "reason": "ramp continuum needs multi-floor continuity"
+    }
+  ],
+
+  "anchor_hint_resolution": {
+    "GROUND": "building.ground_floor_index (기본값 1)",
+    "ANCHOR_HINT_OR_2": "anchor_floor_hint 제공 시 해당 층, 미제공 시 2층으로 fallback"
+  },
+
+  "start_floor_rules": [
+    {
+      "when_void_type_in": ["ATRIUM", "DOUBLE_HEIGHT", "INDUSTRIAL_HIGH_BAY", "RAMP_CONTINUUM"],
+      "choose_start_floor": "GROUND",
+      "reason": "public legibility and entry sequence"
+    },
+    {
+      "when_void_type_in": ["COURTYARD_VOID"],
+      "choose_start_floor": "GROUND",
+      "reason": "Courtyard void는 지면층에 고정되어 외부 경관 및 진입 시퀀스를 지원함."
+    },
+    {
+      "when_void_type_in": ["LIGHT_WELL", "MEZZANINE_OVERLAP"],
+      "choose_start_floor": "ANCHOR_HINT_OR_2",
+      "reason": "often internal device that can begin above lobby level"
+    }
+  ],
+
+  "span_selection_algorithm": {
+    "steps": [
+      "1) Read floors_total (F) and vertical_intensity (VI).",
+      "2) Get base span typ S_base from base_span_by_vertical_intensity[VI].typ.",
+      "3) Get void_type constraints: min_v, max_v, prefer_start_floor.",
+      "4) Apply pattern_span_adjustments to S_base => S_adj (delta_typ, min_override, etc.).",
+      "5) Clamp S_adj within [min_v, max_v].",
+      "6) Cap by building size: S_cap = max(1, floor(F * max_span_cap_by_total_floors_ratio)). span = min(span, S_cap). Safety clamp: span = min(span, F).",
+      "7) Decide start_floor using start_floor_rules; default is ground_floor_index (1) unless allowed mid-start.",
+      "8) end_floor = start_floor + span - 1.",
+      "9) If end_floor > F: end_floor = F, start_floor = max(ground_floor_index, end_floor - span + 1). Recompute span_count = end_floor - start_floor + 1.",
+      "10) Output span: {start_floor, end_floor, span_count}."
+    ],
+    "outputs": {
+      "span": { "start_floor": "int", "end_floor": "int", "span_count": "int" },
+      "debug": { "base": "int", "after_pattern": "int", "after_constraints": "int", "after_caps": "int", "chosen_start": "int" }
+    }
+  },
+
+  "examples": [
+    {
+      "case": "Office tower lobby atrium",
+      "inputs": {
+        "floors_total": 20,
+        "vertical_intensity": "HIGH",
+        "selected_patterns": ["ORG_CORE_PERIMETER"],
+        "void_type": "ATRIUM",
+        "anchor_floor_hint": 1
+      },
+      "expected": { "span": { "start_floor": 1, "end_floor": 4, "span_count": 4 } }
+    },
+    {
+      "case": "Small 3-floor school with courtyard",
+      "inputs": {
+        "floors_total": 3,
+        "vertical_intensity": "LOW",
+        "selected_patterns": ["VOID_COURTYARD_CANDIDATE"],
+        "void_type": "COURTYARD_VOID",
+        "anchor_floor_hint": 1
+      },
+      "expected": { "span": { "start_floor": 1, "end_floor": 2, "span_count": 2 } }
+    },
+    {
+      "case": "Light well in mid floors",
+      "inputs": {
+        "floors_total": 8,
+        "vertical_intensity": "MODERATE",
+        "selected_patterns": ["ORG_DISTRIBUTED_CLUSTERS"],
+        "void_type": "LIGHT_WELL",
+        "anchor_floor_hint": 3
+      },
+      "expected": { "span": { "start_floor": 3, "end_floor": 5, "span_count": 3 } }
+    }
+  ]
+}

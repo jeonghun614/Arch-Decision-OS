@@ -1,0 +1,136 @@
+{
+  "schema": {
+    "name": "space_min_area_rules",
+    "version": "1.0.0",
+    "description": "Minimum area constraints for spaces before area scaling."
+  },
+
+  "universal_space_min": {
+    "STAIR": {
+      "min_each_area": 15,
+      "min_count": 1
+    },
+    "ELEVATOR_CORE": {
+      "min_each_area": 20,
+      "min_count": 0
+    },
+    "CORRIDOR": {
+      "min_total_ratio_of_gfa": 0.08
+    },
+    "TOILET": {
+      "min_each_area": 4,
+      "min_count": 1
+    },
+    "MEP_SHAFT": {
+      "min_each_area": 3,
+      "min_count": 1
+    },
+    "MEP_ROOM": {
+      "min_each_area": 12,
+      "min_count": 1
+    }
+  },
+
+  "category_min_constraints": {
+    "PRIMARY": {
+      "min_ratio_of_gfa": 0.30,
+      "max_ratio_of_gfa": 0.75
+    },
+    "PRIVATE": {
+      "min_ratio_of_gfa": 0.00,
+      "max_ratio_of_gfa": 0.60
+    },
+    "SHARED": {
+      "min_ratio_of_gfa": 0.05,
+      "max_ratio_of_gfa": 0.40
+    },
+    "BUFFER": {
+      "min_ratio_of_gfa": 0.00,
+      "max_ratio_of_gfa": 0.20
+    },
+    "SERVICE": {
+      "min_ratio_of_gfa": 0.08,
+      "max_ratio_of_gfa": 0.30
+    },
+    "CIRCULATION": {
+      "min_ratio_of_gfa": 0.10,
+      "max_ratio_of_gfa": 0.35
+    },
+    "VOID": {
+      "min_ratio_of_gfa": 0.00,
+      "max_ratio_of_gfa": 0.25,
+      "counts_as_gfa": false
+    }
+  },
+
+  "domain_overrides": {
+    "EDUCATION": {
+      "CLASSROOM": {
+        "min_each_area": 40
+      },
+      "LECTURE_HALL": {
+        "min_each_area": 80
+      }
+    },
+
+    "HEALTHCARE": {
+      "EXAM_ROOM": {
+        "min_each_area": 12
+      },
+      "OPERATING_ROOM": {
+        "min_each_area": 60
+      },
+      "ICU_ROOM": {
+        "min_each_area": 18
+      }
+    },
+
+    "RETAIL": {
+      "SALES_FLOOR": {
+        "min_ratio_of_gfa": 0.40
+      },
+      "STORAGE": {
+        "min_ratio_of_gfa": 0.08
+      }
+    },
+
+    "OFFICE": {
+      "WORKSPACE": {
+        "min_ratio_of_gfa": 0.35
+      },
+      "MEETING_ROOM": {
+        "min_each_area": 12
+      }
+    },
+
+    "INDUSTRIAL": {
+      "PRODUCTION_AREA": {
+        "min_ratio_of_gfa": 0.50
+      },
+      "LOADING_DOCK": {
+        "min_each_area": 40
+      }
+    }
+  },
+
+  "resolution_strategy": {
+    "priority_order": [
+      "universal_space_min",
+      "category_min_constraints",
+      "domain_overrides"
+    ],
+
+    "if_total_area_exceeds_gfa": [
+      "reduce_BUFFER_first",
+      "reduce_SHARED_next",
+      "reduce_PRIVATE_next",
+      "never_reduce_below_minimum"
+    ],
+
+    "if_total_area_below_minimum_required": [
+      "increase_PRIMARY",
+      "increase_SERVICE",
+      "increase_CIRCULATION"
+    ]
+  }
+}

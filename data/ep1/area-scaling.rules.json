@@ -1,0 +1,72 @@
+{
+  "schema": {
+    "name": "area_scaling_engine",
+    "version": "1.0.0",
+    "description": "Distribute total GFA into clusters and spaces with minimum area enforcement."
+  },
+  "cluster_allocation": {
+    "method": "weight_proportional",
+    "normalize_weights": true,
+    "rounding_strategy": "floor_then_distribute_remainder"
+  },
+  "space_allocation": {
+    "method": "weight_proportional_within_cluster",
+    "inherit_cluster_area": true
+  },
+  "minimum_enforcement": {
+    "apply_universal_first": true,
+    "apply_category_second": true,
+    "apply_domain_third": true,
+    "enforcement_strategy": "increase_to_minimum",
+    "track_adjustments": true
+  },
+  "overflow_resolution": {
+    "trigger_condition": "total_allocated_area_gt_total_gfa",
+    "reduction_priority_order": [
+      "BUFFER",
+      "SHARED",
+      "PRIVATE",
+      "SERVICE",
+      "CIRCULATION",
+      "PRIMARY"
+    ],
+    "reduction_method": "proportional_within_category",
+    "never_reduce_below_minimum": true,
+    "max_iterations": 10
+  },
+  "underflow_resolution": {
+    "trigger_condition": "total_allocated_area_lt_total_gfa",
+    "increase_priority_order": [
+      "PRIMARY",
+      "SERVICE",
+      "CIRCULATION"
+    ],
+    "increase_method": "proportional_within_category"
+  },
+  "void_handling": {
+    "void_counts_as_gfa": false,
+    "void_area_calculation": "deduct_after_cluster_allocation",
+    "max_void_ratio": 0.25
+  },
+  "output_contract": {
+    "clusters": [
+      {
+        "id": "CLU-001",
+        "allocated_area": 0,
+        "spaces": [
+          {
+            "space_id": "SP-001",
+            "allocated_area": 0,
+            "min_area_applied": false
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "total_allocated_area": 0,
+      "total_gfa": 0,
+      "difference": 0,
+      "adjustment_cycles": 0
+    }
+  }
+}

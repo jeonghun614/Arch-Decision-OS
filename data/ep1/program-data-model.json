@@ -1,0 +1,251 @@
+{
+  "schema": {
+    "name": "program_3tier_data_model",
+    "version": "1.1.0",
+    "description": "Category(L1) → Cluster(L2) → Space(L3) 3단계 프로그램 트리의 데이터 모델. Space 객체에 대한 JSON Schema를 포함."
+  },
+
+  "hierarchy": {
+    "L1_category": {
+      "description": "프로그램 카테고리 레이블. 공간의 공공성/기능 성격을 분류하는 최상위 분류.",
+      "allowed_values": ["PRIMARY", "PRIVATE", "SHARED", "BUFFER", "SERVICE", "CIRCULATION", "VOID"]
+    },
+    "L2_cluster": {
+      "description": "패턴 조합 엔진이 생성하는 공간 그룹. 면적 배분 및 관계 그래프의 중간 단위.",
+      "id_format": "CLU-{NNN}",
+      "schema_ref": "Cluster 규칙.json § output_contract.cluster_object_example"
+    },
+    "L3_space": {
+      "description": "개별 공간 객체. Space Kit 템플릿에서 인스턴스화되며, 면적 스케일링 후 확정됨.",
+      "id_format": "SP-{NNNN}",
+      "schema": "하단 space_json_schema 참조"
+    }
+  },
+
+  "space_json_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "space_object",
+    "title": "Space (Level 3)",
+    "description": "Program Tree의 최하위 단위. Space Kit 템플릿에서 생성되며 area scaling 후 확정되는 개별 공간 객체.",
+    "type": "object",
+    "required": [
+      "id", "name", "space_type", "category_label", "cluster_id",
+      "quantity", "area", "placement", "access_visibility",
+      "performance", "operations", "structure_mep", "void", "links"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^SP-[0-9]{4}$",
+        "description": "공간 고유 ID (예: SP-0001)"
+      },
+      "name": { "type": "string" },
+      "space_type": {
+        "type": "string",
+        "description": "공간 기능 타입 식별자 (예: LOBBY, STAIR, CLASSROOM 등)"
+      },
+      "category_label": {
+        "type": "string",
+        "enum": ["PRIMARY", "PRIVATE", "SHARED", "BUFFER", "SERVICE", "CIRCULATION", "VOID"]
+      },
+      "cluster_id": {
+        "type": "string",
+        "pattern": "^CLU-[0-9]{3}$",
+        "description": "소속 클러스터 ID"
+      },
+      "quantity": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "동일 템플릿에서 생성되는 공간 수"
+      },
+      "area": {
+        "type": "object",
+        "required": ["each_m2", "total_m2", "net_or_gross", "constraints", "efficiency_factor"],
+        "properties": {
+          "each_m2": { "type": "number", "minimum": 0, "description": "단위 공간 면적 (스케일링 후 확정)" },
+          "total_m2": { "type": "number", "minimum": 0, "description": "quantity × each_m2" },
+          "net_or_gross": { "type": "string", "enum": ["NET", "GROSS"] },
+          "constraints": {
+            "type": "object",
+            "required": ["min_each_m2", "max_each_m2", "min_total_m2", "max_total_m2"],
+            "properties": {
+              "min_each_m2": { "type": ["number", "null"], "minimum": 0 },
+              "max_each_m2": { "type": ["number", "null"] },
+              "min_total_m2": { "type": ["number", "null"], "minimum": 0 },
+              "max_total_m2": { "type": ["number", "null"] }
+            }
+          },
+          "efficiency_factor": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 2.0,
+            "description": "순면적 대비 실제 점유 계수 (기본 1.0)"
+          }
+        }
+      },
+      "placement": {
+        "type": "object",
+        "required": ["floor_preference", "span", "zoning_hint"],
+        "properties": {
+          "floor_preference": {
+            "type": "object",
+            "required": ["preferred", "avoid", "min_floor", "max_floor"],
+            "properties": {
+              "preferred": { "type": "array", "items": { "type": "integer" } },
+              "avoid": { "type": "array", "items": { "type": "integer" } },
+              "min_floor": { "type": "integer", "minimum": 1 },
+              "max_floor": { "type": "integer", "minimum": 1, "description": "999 = 제한 없음" }
+            }
+          },
+          "span": {
+            "type": "object",
+            "required": ["type", "from_floor", "to_floor"],
+            "properties": {
+              "type": { "type": "string", "enum": ["SINGLE_FLOOR", "MULTI_LEVEL"] },
+              "from_floor": { "type": "integer", "minimum": 1 },
+              "to_floor": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "zoning_hint": {
+            "type": "object",
+            "properties": {
+              "front_back": { "type": ["string", "null"], "enum": ["FRONT", "BACK", null] },
+              "center_perimeter": { "type": ["string", "null"], "enum": ["CENTER", "PERIMETER", null] },
+              "quiet_loud": { "type": ["string", "null"], "enum": ["QUIET", "LOUD", null] },
+              "clean_dirty": { "type": ["string", "null"], "enum": ["CLEAN", "DIRTY", null] }
+            }
+          }
+        }
+      },
+      "access_visibility": {
+        "type": "object",
+        "required": ["access_level", "visibility_level", "acoustic_sensitivity", "privacy_level"],
+        "properties": {
+          "access_level": { "type": "string", "enum": ["OPEN", "CONTROLLED", "RESTRICTED"] },
+          "visibility_level": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "acoustic_sensitivity": { "type": "string", "enum": ["LOW", "MED", "HIGH"] },
+          "privacy_level": { "type": "string", "enum": ["LOW", "MED", "HIGH"] }
+        }
+      },
+      "performance": {
+        "type": "object",
+        "required": ["daylight_need", "ventilation_need", "thermal_control_need", "humidity_control_need"],
+        "properties": {
+          "daylight_need": { "type": "string", "enum": ["LOW", "MED", "HIGH"] },
+          "ventilation_need": { "type": "string", "enum": ["LOW", "MED", "HIGH"] },
+          "thermal_control_need": { "type": "string", "enum": ["LOW", "MED", "HIGH"] },
+          "humidity_control_need": { "type": "string", "enum": ["NONE", "LOW", "MED", "HIGH"] }
+        }
+      },
+      "operations": {
+        "type": "object",
+        "required": ["operating_hours", "staff_only", "public_facing", "security_requirement"],
+        "properties": {
+          "operating_hours": { "type": "string", "enum": ["STATIC", "SCHEDULED", "EVENT", "CONTINUOUS_24H"] },
+          "staff_only": { "type": "boolean" },
+          "public_facing": { "type": "boolean" },
+          "security_requirement": { "type": "string", "enum": ["OPEN", "CONTROLLED", "RESTRICTED"] }
+        }
+      },
+      "structure_mep": {
+        "type": "object",
+        "required": ["heavy_load", "wet_zone", "shaft_required", "equipment_heat", "power_demand"],
+        "properties": {
+          "heavy_load": { "type": "boolean" },
+          "wet_zone": { "type": "boolean" },
+          "shaft_required": { "type": "boolean" },
+          "equipment_heat": { "type": "string", "enum": ["LOW", "MED", "HIGH"] },
+          "power_demand": { "type": "string", "enum": ["LOW", "MED", "HIGH"] }
+        }
+      },
+      "void": {
+        "type": "object",
+        "required": ["is_void"],
+        "properties": {
+          "is_void": { "type": "boolean" },
+          "void_type": {
+            "type": ["string", "null"],
+            "enum": ["ATRIUM", "COURTYARD_VOID", "LIGHT_WELL", null]
+          },
+          "span_behavior": { "type": ["string", "null"] },
+          "area_effect": {
+            "type": ["object", "null"],
+            "properties": {
+              "subtract_footprint_ratio_per_floor": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          },
+          "relation_effect": {
+            "type": ["object", "null"],
+            "properties": {
+              "visibility_multiplier": { "type": "number", "minimum": 0 }
+            }
+          }
+        }
+      },
+      "links": {
+        "type": "object",
+        "properties": {
+          "must_adjoin": { "type": "array", "items": { "type": "string" }, "description": "반드시 인접해야 할 공간명" },
+          "should_adjoin": { "type": "array", "items": { "type": "string" } },
+          "avoid_adjoin": { "type": "array", "items": { "type": "string" } },
+          "vertical_preference": {
+            "type": "object",
+            "properties": {
+              "prefer_overlook_to": { "type": "array", "items": { "type": "string" } },
+              "prefer_below": { "type": "array", "items": { "type": "string" } },
+              "prefer_above": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      },
+      "ui": {
+        "type": "object",
+        "properties": {
+          "display_tags": { "type": "array", "items": { "type": "string" } },
+          "label_override": { "type": ["string", "null"] },
+          "color_hint": { "type": ["string", "null"] }
+        }
+      },
+      "notes": { "type": "string" }
+    }
+  },
+
+  "example_instance": {
+    "id": "SP-0001",
+    "name": "Lobby",
+    "space_type": "LOBBY",
+    "category_label": "SHARED",
+    "cluster_id": "CLU-001",
+    "quantity": 1,
+    "area": {
+      "each_m2": 60,
+      "total_m2": 60,
+      "net_or_gross": "NET",
+      "constraints": {
+        "min_each_m2": 30,
+        "max_each_m2": null,
+        "min_total_m2": 30,
+        "max_total_m2": null
+      },
+      "efficiency_factor": 1.0
+    },
+    "placement": {
+      "floor_preference": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 1 },
+      "span": { "type": "SINGLE_FLOOR", "from_floor": 1, "to_floor": 1 },
+      "zoning_hint": { "front_back": "FRONT", "center_perimeter": "PERIMETER", "quiet_loud": null, "clean_dirty": null }
+    },
+    "access_visibility": { "access_level": "OPEN", "visibility_level": 3, "acoustic_sensitivity": "LOW", "privacy_level": "LOW" },
+    "performance": { "daylight_need": "MED", "ventilation_need": "MED", "thermal_control_need": "MED", "humidity_control_need": "NONE" },
+    "operations": { "operating_hours": "SCHEDULED", "staff_only": false, "public_facing": true, "security_requirement": "CONTROLLED" },
+    "structure_mep": { "heavy_load": false, "wet_zone": false, "shaft_required": false, "equipment_heat": "LOW", "power_demand": "LOW" },
+    "void": { "is_void": false, "void_type": null, "span_behavior": null, "area_effect": null, "relation_effect": null },
+    "links": {
+      "must_adjoin": [],
+      "should_adjoin": [],
+      "avoid_adjoin": [],
+      "vertical_preference": { "prefer_overlook_to": [], "prefer_below": [], "prefer_above": [] }
+    },
+    "ui": { "display_tags": ["entry"], "label_override": null, "color_hint": null },
+    "notes": ""
+  }
+}

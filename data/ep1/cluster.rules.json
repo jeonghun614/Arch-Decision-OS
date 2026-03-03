@@ -1,0 +1,227 @@
+{
+  "schema": {
+    "name": "cluster_rules",
+    "version": "1.0.0",
+    "description": "Rules for creating, merging, splitting, validating clusters (Level 2) from selected patterns + domain vector."
+  },
+
+  "cluster_model": {
+    "cluster_id_format": "CLU-{NNN}",
+    "required_fields": ["id", "name", "category_label", "weight", "space_kits"],
+    "optional_fields": [
+      "rules_ref",
+      "placement_bias",
+      "relation_bias",
+      "tags",
+      "notes"
+    ]
+  },
+
+  "category_labels": ["PRIMARY", "PRIVATE", "SHARED", "BUFFER", "SERVICE", "CIRCULATION", "VOID"],
+
+  "global_defaults": {
+    "min_total_clusters": 3,
+    "max_total_clusters": 9,
+    "min_clusters_by_category": {
+      "PRIMARY": 1,
+      "CIRCULATION": 1,
+      "SERVICE": 1
+    },
+    "soft_optional_clusters_by_category": {
+      "SHARED": 0,
+      "PRIVATE": 0,
+      "BUFFER": 0,
+      "VOID": 0
+    }
+  },
+
+  "cluster_generation_pipeline": [
+    "collect_cluster_templates_from_selected_patterns",
+    "normalize_cluster_weights_within_category",
+    "apply_domain_vector_biases",
+    "enforce_minimum_cluster_set",
+    "merge_duplicates_and_near_duplicates",
+    "split_oversized_clusters",
+    "validate_and_fix"
+  ],
+
+  "weight_rules": {
+    "weight_meaning": "relative size hint among clusters before area scaling",
+    "normalize_strategy": "sum_to_1_within_all_clusters",
+    "min_cluster_weight": 0.05,
+    "max_cluster_weight": 0.75,
+    "remainder_distribution": "proportional"
+  },
+
+  "domain_vector_bias_rules": {
+    "publicness_level_effects": [
+      {
+        "if": { "publicness_level": "PUBLIC" },
+        "adjust": [
+          { "category_label": "SHARED", "delta_weight": 0.06 },
+          { "category_label": "PRIVATE", "delta_weight": -0.04 }
+        ]
+      },
+      {
+        "if": { "publicness_level": "SEMI_PUBLIC" },
+        "adjust": [
+          { "category_label": "SHARED", "delta_weight": 0.03 },
+          { "category_label": "PRIVATE", "delta_weight": -0.02 }
+        ]
+      }
+    ],
+    "security_level_effects": [
+      {
+        "if": { "security_level": "RESTRICTED" },
+        "adjust": [
+          { "category_label": "SERVICE", "delta_weight": 0.05 },
+          { "category_label": "BUFFER", "delta_weight": 0.03 },
+          { "category_label": "SHARED", "delta_weight": -0.04 }
+        ]
+      },
+      {
+        "if": { "security_level": "CONTROLLED" },
+        "adjust": [
+          { "category_label": "BUFFER", "delta_weight": 0.02 }
+        ]
+      }
+    ],
+    "operational_complexity_effects": [
+      {
+        "if": { "operational_complexity": "CONTINUOUS_24H" },
+        "adjust": [
+          { "category_label": "CIRCULATION", "delta_weight": 0.03 },
+          { "category_label": "SERVICE", "delta_weight": 0.03 }
+        ]
+      }
+    ],
+    "spatial_intensity_effects": [
+      {
+        "if": { "spatial_intensity": "LARGE_SPAN" },
+        "adjust": [
+          { "category_label": "PRIMARY", "delta_weight": 0.08 },
+          { "category_label": "CIRCULATION", "delta_weight": -0.03 }
+        ]
+      }
+    ],
+    "vertical_intensity_effects": [
+      {
+        "if": { "vertical_intensity": "HIGH" },
+        "adjust": [
+          { "category_label": "SERVICE", "delta_weight": 0.03 },
+          { "category_label": "CIRCULATION", "delta_weight": 0.03 }
+        ]
+      }
+    ]
+  },
+
+  "minimum_cluster_set_rules": {
+    "required_cluster_kits_by_category": {
+      "CIRCULATION": ["KIT_VERTICAL_CORE", "KIT_CORRIDORS_STAIRS"],
+      "SERVICE": ["KIT_MEP_SHAFTS"],
+      "SHARED": ["KIT_ENTRY_LOBBY_RECEPTION"]
+    },
+    "fallback_cluster_templates": [
+      {
+        "name": "Primary Program",
+        "category_label": "PRIMARY",
+        "weight": 0.55,
+        "space_kits": ["KIT_GENERIC_PRIMARY_CELLULAR"]
+      },
+      {
+        "name": "Circulation Network",
+        "category_label": "CIRCULATION",
+        "weight": 0.15,
+        "space_kits": ["KIT_CORRIDORS_STAIRS", "KIT_VERTICAL_CORE"]
+      },
+      {
+        "name": "Service Support",
+        "category_label": "SERVICE",
+        "weight": 0.12,
+        "space_kits": ["KIT_MEP_SHAFTS", "KIT_MEP_GENERAL"]
+      },
+      {
+        "name": "Entry / Interface",
+        "category_label": "SHARED",
+        "weight": 0.08,
+        "space_kits": ["KIT_ENTRY_LOBBY_RECEPTION"]
+      },
+      {
+        "name": "Buffers / Thresholds",
+        "category_label": "BUFFER",
+        "weight": 0.10,
+        "space_kits": ["KIT_BUFFERS_THRESHOLDS"]
+      }
+    ],
+    "enforcement_logic": {
+      "if_missing_category_min": "add_best_matching_fallback_template",
+      "if_total_clusters_below_min": "add_fallbacks_in_priority_order",
+      "fallback_priority_order": ["PRIMARY", "CIRCULATION", "SERVICE", "SHARED", "BUFFER"]
+    }
+  },
+
+  "merge_rules": {
+    "merge_key_strategy": "category_plus_shared_space_kits_signature",
+    "signature_kit_sort": true,
+    "merge_if_same_category_and_signature": true,
+    "merge_if_same_category_and_name_similarity_gte": 0.85,
+    "merge_weight_strategy": "sum_then_cap",
+    "merge_cap_weight": 0.75,
+    "notes": "Merging prevents duplicate clusters created by multiple patterns."
+  },
+
+  "split_rules": {
+    "split_if_cluster_weight_gt": 0.45,
+    "split_max_parts": 3,
+    "split_strategy": "duplicate_cluster_and_divide_weight",
+    "split_name_suffixes": ["A", "B", "C"],
+    "split_space_kits_strategy": "keep_same_kits_initially",
+    "notes": "Splitting is conservative in v1.0. Later versions can split by kit types."
+  },
+
+  "placement_bias_rules": {
+    "default_floor_preference_by_category": {
+      "SHARED": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 2 },
+      "PRIVATE": { "preferred": [], "avoid": [1], "min_floor": 2, "max_floor": 999 },
+      "SERVICE": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 },
+      "CIRCULATION": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 },
+      "PRIMARY": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 },
+      "BUFFER": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 },
+      "VOID": { "preferred": [1], "avoid": [], "min_floor": 1, "max_floor": 999 }
+    },
+    "apply_order": [
+      "pattern_cluster_template_bias",
+      "global_default_bias",
+      "domain_vector_bias"
+    ]
+  },
+
+  "validation_rules": {
+    "must_have_categories": ["PRIMARY", "CIRCULATION", "SERVICE"],
+    "must_have_at_least_one_space_kit_per_cluster": true,
+    "weights_sum_tolerance": 0.02,
+    "max_clusters_enforcement": {
+      "if_exceeds_max": "merge_lowest_weight_clusters_first"
+    },
+    "min_clusters_enforcement": {
+      "if_below_min": "add_fallbacks"
+    }
+  },
+
+  "output_contract": {
+    "output_object_name": "clusters",
+    "cluster_object_example": {
+      "id": "CLU-001",
+      "name": "Circulation Network",
+      "category_label": "CIRCULATION",
+      "weight": 0.15,
+      "space_kits": ["KIT_CORRIDORS_STAIRS", "KIT_VERTICAL_CORE"],
+      "placement_bias": {
+        "floor_preference": { "preferred": [], "avoid": [], "min_floor": 1, "max_floor": 999 }
+      },
+      "rules_ref": [],
+      "tags": [],
+      "notes": ""
+    }
+  }
+}
