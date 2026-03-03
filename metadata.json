@@ -1,0 +1,5 @@
+{
+  "name": "Arch-Decision ADSS",
+  "description": "설계자를 창조적 결정자로 지원하는 건축 의사결정 지원 시스템. 충돌 비용과 트레이드오프를 시각화합니다.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,633 @@
+{
+  "schema": {
+    "name": "dc_to_grammar_mapping",
+    "version": "1.0.0"
+  },
+  "generated_at": "2026-02-21T07:36:38Z",
+  "notes": [
+    "Purpose: compile DC selections (DC1~DC7) + normalized Axis profile into a single SpatialGrammarSpec.",
+    "Merge precedence: defaults < DC mappings < axis adjustments < logic-rule overrides.",
+    "Tool-agnostic. Revit MCP tool name mapping should be handled by an adapter."
+  ],
+  "axis": {
+    "enums": {
+      "Exposure": [
+        "LOW",
+        "MID",
+        "HIGH"
+      ],
+      "VisibilityIntent": [
+        "BLOCKED",
+        "SILHOUETTE",
+        "PARTIAL",
+        "FRAMED",
+        "DIRECT"
+      ],
+      "AccessControl": [
+        "OPEN",
+        "CONTROLLED",
+        "GATED"
+      ],
+      "EncounterMode": [
+        "AVOID",
+        "OPTIONAL",
+        "ENCOURAGED",
+        "MANDATORY"
+      ],
+      "SharingMode": [
+        "NONE",
+        "OPTIONAL",
+        "SHARED_CORE",
+        "EVERYWHERE"
+      ],
+      "SeparationMode": [
+        "MERGED",
+        "BUFFERED",
+        "SEPARATED"
+      ],
+      "Centrality": [
+        "CENTRALIZED",
+        "DISTRIBUTED",
+        "PERIPHERAL"
+      ],
+      "MassTopology": [
+        "MONOLITH",
+        "CLUSTER",
+        "COURTYARD",
+        "LINEAR",
+        "STACKED",
+        "HYBRID",
+        "RING",
+        "MODULAR"
+      ],
+      "Expression": [
+        "SILENT",
+        "CONTRAST",
+        "TRANSPARENT",
+        "FILTERED",
+        "CODED",
+        "HEAVY",
+        "LIGHT",
+        "RHYTHMIC",
+        "MINIMAL"
+      ]
+    },
+    "normalize_hints": {
+      "keyword_rules": [
+        {
+          "if_contains_any": [
+            "보호",
+            "프라이버시",
+            "차단",
+            "폐쇄",
+            "숨김"
+          ],
+          "set": {
+            "Exposure": "LOW",
+            "VisibilityIntent": "BLOCKED",
+            "AccessControl": "CONTROLLED"
+          }
+        },
+        {
+          "if_contains_any": [
+            "노출",
+            "공개",
+            "투명",
+            "개방",
+            "표현"
+          ],
+          "set": {
+            "Exposure": "HIGH",
+            "VisibilityIntent": "DIRECT",
+            "AccessControl": "OPEN"
+          }
+        },
+        {
+          "if_contains_any": [
+            "완충",
+            "버퍼",
+            "전이",
+            "회색지대",
+            "그레이"
+          ],
+          "set": {
+            "SeparationMode": "BUFFERED"
+          }
+        },
+        {
+          "if_contains_any": [
+            "분리",
+            "격리",
+            "비공유",
+            "단절"
+          ],
+          "set": {
+            "SeparationMode": "SEPARATED",
+            "SharingMode": "NONE"
+          }
+        },
+        {
+          "if_contains_any": [
+            "공유",
+            "커뮤니티",
+            "만남",
+            "연결"
+          ],
+          "set": {
+            "SharingMode": "SHARED_CORE",
+            "EncounterMode": "ENCOURAGED"
+          }
+        }
+      ]
+    },
+    "adjustments": [
+      {
+        "when": {
+          "Exposure": "LOW"
+        },
+        "apply": {
+          "grammar.visibility_control.target_range": [
+            0,
+            2
+          ],
+          "grammar.buffer.require_buffer_between_private_shared": true
+        }
+      },
+      {
+        "when": {
+          "Exposure": "HIGH"
+        },
+        "apply": {
+          "grammar.visibility_control.target_range": [
+            3,
+            4
+          ]
+        }
+      },
+      {
+        "when": {
+          "Centrality": "DISTRIBUTED"
+        },
+        "apply": {
+          "grammar.topology.cluster_count_range": [
+            3,
+            6
+          ],
+          "grammar.topology.centrality": "DISTRIBUTED"
+        }
+      },
+      {
+        "when": {
+          "Centrality": "CENTRALIZED"
+        },
+        "apply": {
+          "grammar.topology.cluster_count_range": [
+            1,
+            2
+          ],
+          "grammar.topology.centrality": "CENTRALIZED"
+        }
+      },
+      {
+        "when": {
+          "SeparationMode": "BUFFERED"
+        },
+        "apply": {
+          "grammar.buffer.strategy": "BUFFER_FIELDS",
+          "grammar.buffer.forbid_direct_private_shared": true
+        }
+      },
+      {
+        "when": {
+          "SharingMode": "EVERYWHERE"
+        },
+        "apply": {
+          "grammar.program.area_bias.SHARED": 0.1,
+          "grammar.program.area_bias.PRIVATE": -0.1,
+          "grammar.relations.shared_min_adjacency": 3
+        }
+      }
+    ]
+  },
+  "merge_strategy": {
+    "precedence": [
+      "defaults",
+      "dc",
+      "axis",
+      "logic_rules"
+    ],
+    "array_merge": "replace",
+    "object_merge": "deep_merge",
+    "numeric_merge": "overwrite_unless_additive",
+    "additive_fields_prefix": [
+      "grammar.program.area_bias"
+    ]
+  },
+  "defaults": {
+    "grammar": {
+      "topology": {
+        "type": "HYBRID",
+        "cluster_count_range": [
+          2,
+          4
+        ],
+        "centrality": "DISTRIBUTED"
+      },
+      "buffer": {
+        "strategy": "NONE",
+        "require_buffer_between_private_shared": false,
+        "forbid_direct_private_shared": false,
+        "insert_buffer_field_if": {
+          "visibility_gte": 3,
+          "adjacency_lte": 2
+        }
+      },
+      "circulation": {
+        "type": "SINGLE",
+        "min_routes": 1,
+        "shared_not_gate": false,
+        "optional_detour": false,
+        "time_layered": false,
+        "staged_entry": false,
+        "skip_access": false
+      },
+      "visibility_control": {
+        "target_range": [
+          2,
+          3
+        ],
+        "devices": []
+      },
+      "structural_logic": {
+        "system": "HYBRID",
+        "grid_based": false,
+        "expandable": false,
+        "core_dominant": false,
+        "wall_dominant": false,
+        "independent_modules": false
+      },
+      "expression_logic": {
+        "language": "MINIMAL",
+        "opacity_range": [
+          0.4,
+          0.8
+        ],
+        "material_coding": false,
+        "rhythm": "NONE"
+      },
+      "program": {
+        "area_bias": {
+          "PRIVATE": 0.0,
+          "SHARED": 0.0,
+          "BUFFER": 0.0,
+          "SERVICE": 0.0,
+          "CIRCULATION": 0.0
+        },
+        "base_ratios": {
+          "PRIVATE": 0.55,
+          "SHARED": 0.15,
+          "BUFFER": 0.1,
+          "SERVICE": 0.1,
+          "CIRCULATION": 0.1
+        }
+      },
+      "relations": {
+        "score_model": {
+          "formula": "R=V+A",
+          "visibility_scale": [
+            0,
+            4
+          ],
+          "adjacency_scale": [
+            1,
+            5
+          ]
+        },
+        "forbid_pairs": [],
+        "shared_min_adjacency": null
+      }
+    }
+  },
+  "dc": {
+    "DC1": {
+      "prompt": "이 프로젝트가 끝까지 지켜야 할 핵심 문제는 무엇인가?",
+      "options": {
+        "관계 피로 / 접속의 통제 불가": {
+          "apply": {
+            "grammar.buffer.strategy": "STAGED_TRANSITION",
+            "grammar.buffer.require_buffer_between_private_shared": true,
+            "grammar.circulation.shared_not_gate": true
+          }
+        },
+        "고립 / 사회적 접점 부족": {
+          "apply": {
+            "grammar.visibility_control.target_range": [
+              2,
+              4
+            ],
+            "grammar.circulation.optional_detour": true
+          }
+        },
+        "우연의 과잉 / 마주침 과부하": {
+          "apply": {
+            "grammar.circulation.time_layered": true
+          }
+        },
+        "사생활 침해 / 시선 노출": {
+          "apply": {
+            "grammar.buffer.strategy": "SCREEN_FILTER",
+            "grammar.visibility_control.target_range": [
+              1,
+              3
+            ]
+          }
+        },
+        "공유의 강요 / 선택권 결여": {
+          "apply": {
+            "grammar.topology.type": "LINEAR",
+            "grammar.topology.centrality": "PERIPHERAL"
+          }
+        },
+        "경제성 / 면적 효율": {
+          "apply": {
+            "grammar.topology.type": "MONOLITH",
+            "grammar.topology.cluster_count_range": [
+              1,
+              1
+            ]
+          }
+        },
+        "운영 지속 가능성 / 관리 부담": {
+          "apply": {
+            "grammar.structural_logic.grid_based": true,
+            "grammar.structural_logic.expandable": true
+          }
+        },
+        "메시지/상징성 / 사회적 발언": {
+          "apply": {
+            "grammar.expression_logic.language": "CONTRAST",
+            "grammar.expression_logic.rhythm": "STRONG"
+          }
+        }
+      }
+    },
+    "DC2": {
+      "prompt": "이 문제를 공간적으로 어떤 태도로 다룰 것인가?",
+      "options": {
+        "ON/OFF 이분 구조 (Binary Control)": {
+          "apply": {
+            "grammar.buffer.strategy": "BINARY_ONOFF",
+            "grammar.buffer.require_buffer_between_private_shared": true
+          }
+        },
+        "연속적 스펙트럼 (Gradient Control)": {
+          "apply": {
+            "grammar.buffer.strategy": "GRADIENT",
+            "grammar.circulation.staged_entry": true
+          }
+        },
+        "완충 중심 구조 (Buffer-mediated)": {
+          "apply": {
+            "grammar.buffer.strategy": "BUFFER_FIELDS",
+            "grammar.buffer.require_buffer_between_private_shared": true,
+            "grammar.buffer.forbid_direct_private_shared": true
+          }
+        },
+        "보호 우선 구조 (Protection-first)": {
+          "apply": {
+            "grammar.visibility_control.target_range": [
+              0,
+              2
+            ],
+            "grammar.buffer.strategy": "SCREEN_FILTER"
+          }
+        },
+        "노출 우선 구조 (Exposure-first)": {
+          "apply": {
+            "grammar.visibility_control.target_range": [
+              3,
+              4
+            ],
+            "grammar.buffer.strategy": "NONE"
+          }
+        }
+      }
+    },
+    "DC3": {
+      "prompt": "프로그램은 어떻게 작동해야 하는가?",
+      "options": {
+        "Terminal Program (목적지형 공유)": {
+          "apply": {
+            "grammar.circulation.type": "DEAD_END_ALLOWED"
+          }
+        },
+        "Mandatory Passage Program (필수 경유 공유)": {
+          "apply": {
+            "grammar.circulation.shared_not_gate": false
+          }
+        },
+        "Parallel Programs (병렬 프로그램)": {
+          "apply": {
+            "grammar.circulation.type": "PARALLEL"
+          }
+        },
+        "Buffer Programs (완충 프로그램)": {
+          "apply": {
+            "grammar.buffer.strategy": "BUFFER_FIELDS",
+            "grammar.buffer.require_buffer_between_private_shared": true
+          }
+        },
+        "Time-Separated Program (시간 분리 운영)": {
+          "apply": {
+            "grammar.circulation.time_layered": true
+          }
+        },
+        "User-Initiated Program (사용자 호출형)": {
+          "apply": {
+            "grammar.circulation.optional_detour": true
+          }
+        },
+        "Always-On Program (상시 작동 공유)": {
+          "apply": {
+            "grammar.topology.centrality": "CENTRALIZED"
+          }
+        },
+        "Non-shared (비공유)": {
+          "apply": {
+            "grammar.program.area_bias.SHARED": -0.1,
+            "grammar.program.area_bias.PRIVATE": 0.1,
+            "grammar.buffer.forbid_direct_private_shared": true
+          }
+        }
+      }
+    },
+    "DC4": {
+      "prompt": "지금까지의 논리가 요구하는 덩어리 관계는?",
+      "options": {
+        "Clustered Mass (군집 분절)": {
+          "apply": {
+            "grammar.topology.type": "CLUSTER",
+            "grammar.topology.cluster_count_range": [
+              3,
+              6
+            ]
+          }
+        },
+        "Monolithic Mass (단일체)": {
+          "apply": {
+            "grammar.topology.type": "MONOLITH",
+            "grammar.topology.cluster_count_range": [
+              1,
+              1
+            ]
+          }
+        },
+        "Linear Bar (선형 바)": {
+          "apply": {
+            "grammar.topology.type": "LINEAR",
+            "grammar.topology.cluster_count_range": [
+              2,
+              4
+            ]
+          }
+        },
+        "Courtyard-Based (중정 기반)": {
+          "apply": {
+            "grammar.topology.type": "COURTYARD",
+            "grammar.buffer.strategy": "COURTYARD_VOID"
+          }
+        },
+        "Central Placement (중앙 배치)": {
+          "apply": {
+            "grammar.topology.centrality": "CENTRALIZED",
+            "grammar.topology.cluster_count_range": [
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    "DC5": {
+      "prompt": "사용자는 어떤 ‘선택의 순서’를 경험하는가?",
+      "options": {
+        "이중 동선 (Dual-layer Circulation)": {
+          "apply": {
+            "grammar.circulation.type": "DUAL_LAYER",
+            "grammar.circulation.min_routes": 2
+          }
+        },
+        "단일 경로 (Single-path Circulation)": {
+          "apply": {
+            "grammar.circulation.type": "SINGLE",
+            "grammar.circulation.min_routes": 1
+          }
+        },
+        "선택적 우회 (Optional Detour)": {
+          "apply": {
+            "grammar.circulation.type": "OPTIONAL_DETOUR",
+            "grammar.circulation.min_routes": 2,
+            "grammar.circulation.optional_detour": true
+          }
+        },
+        "루프/회귀 (Loop / Return)": {
+          "apply": {
+            "grammar.circulation.type": "LOOP",
+            "grammar.circulation.min_routes": 1
+          }
+        },
+        "비마주침/직통 (Skip-access / Non-encounter)": {
+          "apply": {
+            "grammar.circulation.type": "SKIP_ACCESS",
+            "grammar.circulation.skip_access": true
+          }
+        }
+      }
+    },
+    "DC6": {
+      "prompt": "이 논리를 구조적으로 어떻게 증명하는가?",
+      "options": {
+        "Structure-Independent Space (구조-공간 독립)": {
+          "apply": {
+            "grammar.structural_logic.independent_modules": true,
+            "grammar.structural_logic.system": "INDEPENDENT"
+          }
+        },
+        "Integrated Structural System (일체형 구조)": {
+          "apply": {
+            "grammar.structural_logic.system": "INTEGRATED"
+          }
+        },
+        "Service-Core Dominant (서비스 코어 지배)": {
+          "apply": {
+            "grammar.structural_logic.core_dominant": true,
+            "grammar.structural_logic.system": "CORE_DOMINANT"
+          }
+        },
+        "Distributed Structural Supports (분산 지지)": {
+          "apply": {
+            "grammar.structural_logic.wall_dominant": true,
+            "grammar.structural_logic.system": "WALL_BEARING"
+          }
+        }
+      }
+    },
+    "DC7": {
+      "prompt": "설명 없이 이 논리가 읽히는가?",
+      "options": {
+        "Opaque / Silent Expression (불투명/침묵)": {
+          "apply": {
+            "grammar.expression_logic.language": "SILENT",
+            "grammar.expression_logic.opacity_range": [
+              0.8,
+              1.0
+            ]
+          }
+        },
+        "Transparent / Expressive (투명/표현)": {
+          "apply": {
+            "grammar.expression_logic.language": "TRANSPARENT",
+            "grammar.expression_logic.opacity_range": [
+              0.1,
+              0.4
+            ]
+          }
+        },
+        "Contrast-Based Expression (대비 기반)": {
+          "apply": {
+            "grammar.expression_logic.language": "CONTRAST",
+            "grammar.expression_logic.rhythm": "STRONG"
+          }
+        },
+        "Unified Architectural Language (통합 언어)": {
+          "apply": {
+            "grammar.expression_logic.language": "MINIMAL",
+            "grammar.expression_logic.rhythm": "UNIFIED"
+          }
+        },
+        "Semi-Transparent Filtering (반투명 필터)": {
+          "apply": {
+            "grammar.expression_logic.language": "LIGHT",
+            "grammar.expression_logic.opacity_range": [
+              0.2,
+              0.6
+            ]
+          }
+        }
+      }
+    }
+  },
+  "logic_rules_overrides": {
+    "concept": "Optional: convert your Logic Rule hits into grammar patches.",
+    "rules": [
+      {
+        "when_rule_type_in": [
+          "exclude"
+        ],
+        "apply": {
+          "grammar.validation.hard_constraints_enforced": true
+        }
+      }
+    ]
+  }
+}
