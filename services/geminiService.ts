@@ -154,8 +154,8 @@ export async function runKernel(
   const ai = new GoogleGenAI({ apiKey });
   const { allowed, blocked } = calculateAvailableOptions(checkpoint, selections);
 
-  const model = "gemini-flash-latest";
-  
+  const model = "gemini-2.5-flash";
+
   const historyText = decisionHistory.map(l => {
     const val = Array.isArray(l.selectedLabel) ? l.selectedLabel.join(" + ") : l.selectedLabel;
     return `[${l.checkpoint}] ${val}`;
@@ -214,11 +214,22 @@ export async function runKernel(
 
   } catch (error) {
     console.error("Kernel Error:", error);
+    const raw = error instanceof Error ? error.message : String(error);
+    let userMsg = "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+    if (raw.includes('free_tier') && raw.includes('limit: 0')) {
+      userMsg = "이 API 키는 결제가 활성화된 프로젝트에서 발급되어 무료 할당량이 0입니다. aistudio.google.com/apikey 에서 '새 프로젝트에 API 키 만들기'로 새 키를 발급하세요.";
+    } else if (raw.includes('"code":429') || raw.includes('RESOURCE_EXHAUSTED')) {
+      userMsg = "API 일일 사용량을 초과했습니다. 내일 다시 시도하거나 새 API 키를 발급하세요.";
+    } else if (raw.includes('"code":404') || raw.includes('NOT_FOUND')) {
+      userMsg = "AI 모델을 찾을 수 없습니다. 개발자에게 문의해주세요.";
+    } else if (raw.includes('API Key') || raw.includes('API_KEY')) {
+      userMsg = "API 키가 없거나 잘못되었습니다. .env 파일을 확인해주세요.";
+    }
     return {
       current_stage: checkpoint,
       available_options: allowed,
       blocked_options: blocked,
-      logic_summary: "AI 서술 생성 실패. 로직 엔진 데이터만 표시합니다.",
+      logic_summary: userMsg,
       critic_ready_statement: [],
       do_not_do: [],
       next_action: "다음 선택을 진행하십시오."
@@ -235,7 +246,7 @@ export async function generateFinalReport(
     throw new Error("API Key is missing.");
   }
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-flash-latest";
+  const model = "gemini-2.5-flash";
 
   // Build a rich history object with attributes
   const richHistory = decisionHistory.map(l => {
@@ -274,11 +285,18 @@ export async function generateFinalReport(
     return JSON.parse(response.text) as FinalReport;
   } catch (error) {
     console.error("Final Report Generation Error:", error);
+    const raw = error instanceof Error ? error.message : String(error);
+    let msg = "결과 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+    if (raw.includes('"code":429') || raw.includes('RESOURCE_EXHAUSTED')) {
+      msg = "API 사용량 한도 초과. 새 API 키(결제 없는 프로젝트)로 교체하거나 내일 다시 시도해주세요.";
+    } else if (raw.includes('"code":404') || raw.includes('NOT_FOUND')) {
+      msg = "AI 모델을 찾을 수 없습니다. 모델명 설정을 확인해주세요.";
+    }
     return {
-      core_logic: "결과 생성 중 오류가 발생했습니다.",
-      causality: "결과 생성 중 오류가 발생했습니다.",
-      user_scenario: "결과 생성 중 오류가 발생했습니다.",
-      excluded_tradeoffs: "결과 생성 중 오류가 발생했습니다."
+      core_logic: msg,
+      causality: "",
+      user_scenario: "",
+      excluded_tradeoffs: ""
     };
   }
 }
@@ -293,7 +311,7 @@ export async function generateVisualGuide(
     throw new Error("API Key is missing.");
   }
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-flash-latest";
+  const model = "gemini-2.5-flash";
 
   const targetDiagramType = DIAGRAM_TYPES[checkpoint];
   
@@ -354,7 +372,7 @@ export async function generateImagePrompt(
     throw new Error("API Key is missing.");
   }
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-flash-latest";
+  const model = "gemini-2.5-flash";
   
   const ids = Array.isArray(selection.id) ? selection.id : [selection.id];
   const labels = Array.isArray(selection.label) ? selection.label : [selection.label];
@@ -407,6 +425,6 @@ export async function generateImagePrompt(
 
   } catch (error) {
     console.error("Prompt Generation Error:", error);
-    return "Failed to generate prompt. Please try again.";
+    return "프롬프트 생성 중 오류가 발생했습니다. 다시 시도해주세요.";
   }
 }

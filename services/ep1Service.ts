@@ -151,7 +151,7 @@ export async function runEP1ProgramTree(
   if (!apiKey) throw new Error("API Key is missing.");
 
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-2.5-flash-preview-04-17";
+  const model = "gemini-2.5-flash";
 
   const ep1Context = `
 === EP1 RULES: DOMAIN VECTOR ===

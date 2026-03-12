@@ -1,3 +1,8 @@
+# Environment variables (API keys - never commit these)
+.env
+.env.local
+.env.*.local
+
 # Logs
 logs
 *.log
@@ -11,6 +16,9 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Claude Code
+.claude/
 
 # Editor directories and files
 .vscode/*
