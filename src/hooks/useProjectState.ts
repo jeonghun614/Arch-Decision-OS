@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Checkpoint, ProjectState, VisualGuide, CHECKPOINT_ORDER, CHECKPOINT_LIMITS } from '@/types';
 import { runKernel, generateFinalReport, generateVisualGuide as generateVisualGuideApi, generateImagePrompt } from '@/services/geminiService';
@@ -37,20 +37,27 @@ export function useProjectState() {
     } catch {}
   }, [state, isStarted]);
 
-  // URL → 체크포인트 동기화
+  // URL → 체크포인트 동기화 (URL 변화에만 반응하도록 의도적으로 제한)
+  const isStartedRef = useRef(isStarted);
+  const stateRef = useRef(state);
+  useEffect(() => { isStartedRef.current = isStarted; }, [isStarted]);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   useEffect(() => {
     const cp = PATH_TO_CP[location.pathname];
-    if (cp && isStarted && cp !== state.currentCheckpoint) {
+    const cur = stateRef.current;
+    const started = isStartedRef.current;
+    if (cp && started && cp !== cur.currentCheckpoint) {
       setState(prev => ({ ...prev, currentCheckpoint: cp, lastEngineOutput: null }));
     }
-    if (location.pathname === '/' && isStarted) {
+    if (location.pathname === '/' && started) {
       setIsStarted(false);
       setState(defaultState);
     }
-    if (location.pathname === '/result' && !state.completed) {
-      if (isStarted) navigate(CP_TO_PATH[state.currentCheckpoint], { replace: true });
+    if (location.pathname === '/result' && !cur.completed) {
+      if (started) navigate(CP_TO_PATH[cur.currentCheckpoint], { replace: true });
     }
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     const checkApiKey = async () => {
@@ -71,16 +78,17 @@ export function useProjectState() {
     }
   };
 
-  const triggerKernel = async () => {
+  const triggerKernel = useCallback(async () => {
     if (kernelRunningRef.current) return;
     kernelRunningRef.current = true;
     setLoading(true);
+    const cur = stateRef.current;
     try {
       const response = await runKernel(
-        state.currentCheckpoint,
-        state.selections,
-        state.logs,
-        { name: state.projectName, description: state.projectDescription }
+        cur.currentCheckpoint,
+        cur.selections,
+        cur.logs,
+        { name: cur.projectName, description: cur.projectDescription }
       );
       setState(prev => ({ ...prev, lastEngineOutput: response }));
     } catch (e) {
@@ -89,7 +97,7 @@ export function useProjectState() {
       setLoading(false);
       kernelRunningRef.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isStarted && !state.completed && !state.lastEngineOutput) {
@@ -108,7 +116,7 @@ export function useProjectState() {
     if (state.completed && !state.finalReport && !generatingReport) {
       generateReport();
     }
-  }, [state.completed, state.finalReport]);
+  }, [state.completed, state.finalReport, generatingReport]);
 
   const generateReport = async () => {
     setGeneratingReport(true);
@@ -127,7 +135,7 @@ export function useProjectState() {
       if (window.aistudio) {
         apiKey = await (window.aistudio as any).getApiKey?.() ?? '';
       }
-      if (!apiKey) apiKey = (import.meta as any).env?.VITE_API_KEY ?? process.env.API_KEY ?? '';
+      if (!apiKey) apiKey = process.env.GEMINI_API_KEY ?? process.env.API_KEY ?? '';
 
       const programTree = await runEP1ProgramTree(grammarResult, apiKey);
 
@@ -153,6 +161,7 @@ export function useProjectState() {
       console.error(e);
       setState(prev => ({
         ...prev,
+        finalReport: prev.finalReport ?? { core_logic: '보고서 생성 중 오류가 발생했습니다.', causality: '', user_scenario: '', excluded_tradeoffs: '' },
         ep1Status: prev.ep1Status === 'loading' ? 'error' : prev.ep1Status,
         ep2Status: prev.ep2Status === 'loading' ? 'error' : prev.ep2Status,
       }));

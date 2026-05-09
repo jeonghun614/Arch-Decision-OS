@@ -155,11 +155,11 @@ export function compileGrammar(
     }
   }
 
-  // 6. Computed Values
-  const site_area_m2 = inputs.site_width_m * inputs.site_depth_m;
-  const footprint_m2 = site_area_m2 * inputs.coverage_ratio;
-  const gross_floor_area_m2 = footprint_m2 * inputs.floors;
-  const net_program_area_m2 = gross_floor_area_m2 * inputs.efficiency_ratio;
+  // 6. Computed Values (모든 면적 단위: mm²)
+  const site_area_mm2 = inputs.site_width_mm * inputs.site_depth_mm;
+  const footprint_mm2 = site_area_mm2 * inputs.coverage_ratio;
+  const gross_floor_area_mm2 = footprint_mm2 * inputs.floors;
+  const net_program_area_mm2 = gross_floor_area_mm2 * inputs.efficiency_ratio;
 
   const levels = Array.from({ length: inputs.floors }, (_, i) => ({
     level: `L${(i + 1).toString().padStart(2, '0')}`,
@@ -176,7 +176,7 @@ export function compileGrammar(
       id: type.substring(0, 3),
       type,
       label: type.charAt(0) + type.slice(1).toLowerCase() + " Area",
-      area_target_m2: net_program_area_m2 * finalRatio
+      area_target_mm2: net_program_area_mm2 * finalRatio
     };
   });
 
@@ -213,10 +213,10 @@ export function compileGrammar(
   const voids: any[] = [];
   if (grammar.topology.type === "COURTYARD" || grammar.buffer.strategy === "BUFFER_FIELDS") {
     voids.push({
-      x: inputs.site_width_m * 0.4,
-      y: inputs.site_depth_m * 0.4,
-      w: inputs.site_width_m * 0.2,
-      h: inputs.site_depth_m * 0.2
+      x: inputs.site_width_mm * 0.4,
+      y: inputs.site_depth_mm * 0.4,
+      w: inputs.site_width_mm * 0.2,
+      h: inputs.site_depth_mm * 0.2
     });
   }
 
@@ -228,10 +228,10 @@ export function compileGrammar(
       applied_rules: [] // Placeholder for rule hits
     },
     computed: {
-      site_area_m2,
-      footprint_m2,
-      gross_floor_area_m2,
-      net_program_area_m2,
+      site_area_mm2,
+      footprint_mm2,
+      gross_floor_area_mm2,
+      net_program_area_mm2,
       levels
     },
     grammar,

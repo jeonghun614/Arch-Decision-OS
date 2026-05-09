@@ -93,8 +93,8 @@ export interface VisualGuide {
 }
 
 export interface SiteInputs {
-  site_width_m: number;
-  site_depth_m: number;
+  site_width_mm: number;
+  site_depth_mm: number;
   coverage_ratio: number;
   floors: number;
   floor_to_floor_mm: number;
@@ -171,8 +171,8 @@ export interface EP1Space {
   cluster_id: string;           // CLU-XXX
   quantity: number;
   area: {
-    each_m2: number;
-    total_m2: number;
+    each_mm2: number;
+    total_mm2: number;
     net_or_gross: 'NET' | 'GROSS';
   };
   placement: {
@@ -230,9 +230,9 @@ export interface EP2FootprintAdjustment {
   floor: number;
   void_id: string;
   void_type: string;
-  plate_area_m2: number;
-  deduct_area_m2: number;
-  remaining_usable_m2: number;
+  plate_area_mm2: number;
+  deduct_area_mm2: number;
+  remaining_usable_mm2: number;
   deduct_mode: string;
   effective_value: number;
   counts_as_gfa: boolean;
@@ -267,10 +267,10 @@ export interface BlueprintJSON {
     applied_rules?: string[];
   };
   computed: {
-    site_area_m2: number;
-    footprint_m2: number;
-    gross_floor_area_m2: number;
-    net_program_area_m2: number;
+    site_area_mm2: number;
+    footprint_mm2: number;
+    gross_floor_area_mm2: number;
+    net_program_area_mm2: number;
     levels: { level: string; elevation_mm: number }[];
   };
   grammar: SpatialGrammar;
@@ -279,7 +279,7 @@ export interface BlueprintJSON {
       id: string;
       type: string;
       label: string;
-      area_target_m2: number;
+      area_target_mm2: number;
     }[];
     relations: {
       edges: { from: string; to: string; visibility: number; adjacency: number; r_score: number }[];

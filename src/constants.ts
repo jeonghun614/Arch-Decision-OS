@@ -20,8 +20,8 @@ export const defaultState: ProjectState = {
   projectName: "",
   projectDescription: "",
   siteInputs: {
-    site_width_m: 30,
-    site_depth_m: 40,
+    site_width_mm: 30000,
+    site_depth_mm: 40000,
     coverage_ratio: 0.45,
     floors: 4,
     floor_to_floor_mm: 3300,

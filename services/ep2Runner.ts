@@ -65,7 +65,7 @@ function deriveVoidNodes(programTree: EP1ProgramTree, blueprint: BlueprintJSON):
       },
       footprint: {
         mode: "RATIO",
-        value: space.area.total_m2 / (blueprint.computed.footprint_m2 || 1),
+        value: space.area.total_mm2 / (blueprint.computed.footprint_mm2 || 1),
         counts_as_gfa: false,
       },
       anchors: { anchor_spaces: anchorSpaces },
@@ -92,7 +92,7 @@ export function runEP2Pipeline(
 ): EP2Output {
   const selectedPatterns = programTree.selected_patterns || [];
   const floors = blueprint.inputs.floors;
-  const footprintM2 = blueprint.computed.footprint_m2;
+  const footprintMM2 = blueprint.computed.footprint_mm2;
 
   // Building 정보 구성
   const building: BuildingInfo = {
@@ -100,7 +100,7 @@ export function runEP2Pipeline(
     ground_floor_index: 1,
     floor_plates: {
       mode: "ONE_PLATE",
-      default_plate_area_m2: footprintM2,
+      default_plate_area_m2: footprintMM2,
     },
   };
 
@@ -147,7 +147,17 @@ export function runEP2Pipeline(
 
   return {
     void_nodes: voidNodes,
-    footprint_adjustments: footprintResult.footprint_adjustments,
+    footprint_adjustments: footprintResult.footprint_adjustments.map(a => ({
+      floor: a.floor,
+      void_id: a.void_id,
+      void_type: a.void_type,
+      plate_area_mm2: a.plate_area_m2,
+      deduct_area_mm2: a.deduct_area_m2,
+      remaining_usable_mm2: a.remaining_usable_m2,
+      deduct_mode: a.deduct_mode,
+      effective_value: a.effective_value,
+      counts_as_gfa: a.counts_as_gfa,
+    })),
     relation_modifiers,
     usable_area_by_floor: footprintResult.usable_area_by_floor,
     warnings,

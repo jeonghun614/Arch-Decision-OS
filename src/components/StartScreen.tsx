@@ -40,21 +40,21 @@ const StartScreen: React.FC<Props> = ({ ctx }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] mono text-zinc-600 mb-1 uppercase font-bold">Site Width (m)</label>
+              <label className="block text-[10px] mono text-zinc-600 mb-1 uppercase font-bold">Site Width (mm)</label>
               <input
                 type="number"
                 className="w-full bg-zinc-900 border border-zinc-800 p-3 text-sm text-white mono focus:border-emerald-600 outline-none"
-                value={state.siteInputs.site_width_m}
-                onChange={(e) => setState(p => ({ ...p, siteInputs: { ...p.siteInputs, site_width_m: Number(e.target.value) } }))}
+                value={state.siteInputs.site_width_mm}
+                onChange={(e) => setState(p => ({ ...p, siteInputs: { ...p.siteInputs, site_width_mm: Number(e.target.value) } }))}
               />
             </div>
             <div>
-              <label className="block text-[10px] mono text-zinc-600 mb-1 uppercase font-bold">Site Depth (m)</label>
+              <label className="block text-[10px] mono text-zinc-600 mb-1 uppercase font-bold">Site Depth (mm)</label>
               <input
                 type="number"
                 className="w-full bg-zinc-900 border border-zinc-800 p-3 text-sm text-white mono focus:border-emerald-600 outline-none"
-                value={state.siteInputs.site_depth_m}
-                onChange={(e) => setState(p => ({ ...p, siteInputs: { ...p.siteInputs, site_depth_m: Number(e.target.value) } }))}
+                value={state.siteInputs.site_depth_mm}
+                onChange={(e) => setState(p => ({ ...p, siteInputs: { ...p.siteInputs, site_depth_mm: Number(e.target.value) } }))}
               />
             </div>
             <div>

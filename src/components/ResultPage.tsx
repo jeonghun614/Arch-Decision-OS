@@ -1,13 +1,58 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CHECKPOINT_LABELS } from '@/types';
 import mappingData from '@/data/dc_to_grammar_mapping.json';
 import { AppContext } from '../hooks/useProjectState';
+import { buildDesignBrief } from '../utils/designBrief';
+
+const DIFFUSION_SERVER = 'http://localhost:5050';
+
+interface FloorResult {
+  floor: number;
+  png_base64: string;
+  rooms: { room_id: string; room_name: string; space_type: string; area_m2: number }[];
+  site_width_mm: number;
+  site_depth_mm: number;
+}
+interface FloorplanResult {
+  floors: FloorResult[];
+  site_width_mm: number;
+  site_depth_mm: number;
+  floor_to_floor_mm: number;
+}
 
 interface Props {
   ctx: AppContext;
 }
 
 const ResultPage: React.FC<Props> = ({ ctx }) => {
+  const [floorplanLoading, setFloorplanLoading] = useState(false);
+  const [floorplanResult, setFloorplanResult] = useState<FloorplanResult | null>(null);
+  const [floorplanError, setFloorplanError] = useState<string | null>(null);
+
+  const handleGenerateFloorplan = async () => {
+    if (!ctx.state.grammarResult) return;
+    setFloorplanLoading(true);
+    setFloorplanError(null);
+    setFloorplanResult(null);
+    try {
+      const res = await fetch(`${DIFFUSION_SERVER}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ctx.state.grammarResult),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `서버 오류 ${res.status}`);
+      }
+      const data = await res.json();
+      setFloorplanResult(data);
+    } catch (e: any) {
+      setFloorplanError(e.message ?? '서버 연결 실패 — HouseDiffusion 서버가 실행 중인지 확인하세요.');
+    } finally {
+      setFloorplanLoading(false);
+    }
+  };
+
   const {
     state,
     activeTab,
@@ -100,7 +145,7 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                 onClick={() => setActiveTab('json')}
                 className={`px-6 py-4 mono text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'json' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-zinc-900' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
-                TAB 3: Blueprint JSON
+                TAB 3: Design Brief
               </button>
             </div>
 
@@ -192,10 +237,10 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                     <div className="animate-in fade-in duration-500">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                         {[
-                          { label: "Site Area", value: state.grammarResult.computed.site_area_m2, unit: "m2" },
-                          { label: "Footprint", value: state.grammarResult.computed.footprint_m2, unit: "m2" },
-                          { label: "Gross Area", value: state.grammarResult.computed.gross_floor_area_m2, unit: "m2" },
-                          { label: "Net Program", value: state.grammarResult.computed.net_program_area_m2, unit: "m2" }
+                          { label: "Site Area", value: state.grammarResult.computed.site_area_mm2 / 1e6, unit: "m²" },
+                          { label: "Footprint", value: state.grammarResult.computed.footprint_mm2 / 1e6, unit: "m²" },
+                          { label: "Gross Area", value: state.grammarResult.computed.gross_floor_area_mm2 / 1e6, unit: "m²" },
+                          { label: "Net Program", value: state.grammarResult.computed.net_program_area_mm2 / 1e6, unit: "m²" }
                         ].map((stat, i) => (
                           <div key={i} className="bg-black p-4 border border-zinc-900">
                             <div className="text-[10px] mono text-zinc-600 mb-1 uppercase">{stat.label}</div>
@@ -213,7 +258,7 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                               <th className="py-3 px-4 mono text-[10px] text-zinc-500 uppercase">ID</th>
                               <th className="py-3 px-4 mono text-[10px] text-zinc-500 uppercase">Type</th>
                               <th className="py-3 px-4 mono text-[10px] text-zinc-500 uppercase">Label</th>
-                              <th className="py-3 px-4 mono text-[10px] text-zinc-500 uppercase text-right">Target (m2)</th>
+                              <th className="py-3 px-4 mono text-[10px] text-zinc-500 uppercase text-right">Target (m²)</th>
                             </tr>
                           </thead>
                           <tbody className="text-sm">
@@ -231,7 +276,7 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-zinc-300">{p.label}</td>
-                                <td className="py-3 px-4 text-right font-bold text-white">{Math.round(p.area_target_m2).toLocaleString()}</td>
+                                <td className="py-3 px-4 text-right font-bold text-white">{Math.round(p.area_target_mm2 / 1e6).toLocaleString()}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -270,61 +315,88 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                   )}
 
                   {activeTab === 'json' && (
-                    <div className="animate-in fade-in duration-500 flex flex-col h-full">
-                      <div className="flex gap-3 mb-4">
-                        <div className={`text-[9px] mono px-3 py-1 rounded-full font-bold border ${
-                          state.ep1Status === 'done' ? 'border-emerald-500 text-emerald-400 bg-emerald-900/30' :
-                          state.ep1Status === 'loading' ? 'border-amber-500 text-amber-400 bg-amber-900/30 animate-pulse' :
-                          state.ep1Status === 'error' ? 'border-red-500 text-red-400 bg-red-900/30' :
-                          'border-zinc-700 text-zinc-500'
-                        }`}>
-                          EP1 PROGRAM TREE {state.ep1Status === 'loading' ? '...' : state.ep1Status.toUpperCase()}
-                        </div>
-                        <div className={`text-[9px] mono px-3 py-1 rounded-full font-bold border ${
-                          state.ep2Status === 'done' ? 'border-emerald-500 text-emerald-400 bg-emerald-900/30' :
-                          state.ep2Status === 'loading' ? 'border-amber-500 text-amber-400 bg-amber-900/30 animate-pulse' :
-                          state.ep2Status === 'error' ? 'border-red-500 text-red-400 bg-red-900/30' :
-                          'border-zinc-700 text-zinc-500'
-                        }`}>
-                          EP2 VOID ENGINE {state.ep2Status === 'loading' ? '...' : state.ep2Status.toUpperCase()}
-                        </div>
-                        {state.grammarResult?.program_tree && (
-                          <div className="text-[9px] mono px-3 py-1 text-zinc-400">
-                            {state.grammarResult.program_tree.spaces.length} spaces · {state.grammarResult.program_tree.clusters.length} clusters
+                    <div className="animate-in fade-in duration-500 space-y-6">
+                      {/* AI 서술 섹션 */}
+                      {state.finalReport && (
+                        <div className="space-y-4">
+                          <div className="bg-black p-5 border border-zinc-900">
+                            <h3 className="mono text-[10px] text-indigo-400 font-bold uppercase mb-2 pb-2 border-b border-zinc-900">공간 경험 시나리오</h3>
+                            <p className="text-xs text-zinc-300 leading-relaxed">{state.finalReport.user_scenario}</p>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center mb-4">
-                        <div className="text-[10px] mono text-zinc-500 uppercase">Blueprint IR JSON</div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(JSON.stringify(state.grammarResult, null, 2));
-                              alert("JSON copied!");
-                            }}
-                            className="text-[10px] mono bg-zinc-800 hover:bg-zinc-700 px-3 py-1 text-white transition-colors"
-                          >
-                            COPY
-                          </button>
-                          <button
-                            onClick={() => {
-                              const blob = new Blob([JSON.stringify(state.grammarResult, null, 2)], { type: 'application/json' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `blueprint_${state.projectName.replace(/\s+/g, '_')}.json`;
-                              a.click();
-                            }}
-                            className="text-[10px] mono bg-emerald-700 hover:bg-emerald-600 px-3 py-1 text-white transition-colors"
-                          >
-                            DOWNLOAD
-                          </button>
+                          <div className="bg-black p-5 border border-zinc-900">
+                            <h3 className="mono text-[10px] text-amber-500 font-bold uppercase mb-2 pb-2 border-b border-zinc-900">의도적 배제 & 기회비용</h3>
+                            <p className="text-xs text-zinc-300 leading-relaxed">{state.finalReport.excluded_tradeoffs}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex-1 bg-black border border-zinc-900 p-4 overflow-auto max-h-[500px]">
-                        <pre className="text-[10px] text-emerald-500/80 font-mono leading-relaxed">
-                          {JSON.stringify(state.grammarResult, null, 2)}
-                        </pre>
+                      )}
+
+                      {/* 계산 기반 Design Brief */}
+                      {state.grammarResult?.program_tree ? (() => {
+                        const blocks = buildDesignBrief(state.grammarResult!);
+                        const colorMap = {
+                          emerald: { border: 'border-emerald-900/50', title: 'text-emerald-500', hl: 'text-emerald-400' },
+                          indigo:  { border: 'border-indigo-900/50',  title: 'text-indigo-400',  hl: 'text-indigo-300' },
+                          amber:   { border: 'border-amber-900/50',   title: 'text-amber-500',   hl: 'text-amber-300'  },
+                          zinc:    { border: 'border-zinc-800',       title: 'text-zinc-400',    hl: 'text-zinc-200'   },
+                        };
+                        return blocks.map((block, bi) => {
+                          const c = colorMap[block.color];
+                          return (
+                            <div key={bi} className={`bg-black p-5 border ${c.border}`}>
+                              <h3 className={`mono text-[10px] font-bold uppercase mb-3 pb-2 border-b border-zinc-900 ${c.title}`}>
+                                {block.title}
+                              </h3>
+                              <div className="space-y-3">
+                                {block.rows.map((row, ri) => (
+                                  row.value === '' && !row.sub ? (
+                                    <div key={ri} className="mono text-[9px] text-zinc-600 uppercase pt-2">{row.label}</div>
+                                  ) : (
+                                    <div key={ri} className="flex flex-col gap-0.5">
+                                      <div className="flex justify-between items-baseline gap-2">
+                                        <span className={`text-xs ${row.highlight ? c.hl : 'text-zinc-400'}`}>{row.label}</span>
+                                        {row.value && (
+                                          <span className={`mono text-xs font-bold whitespace-nowrap ${row.highlight ? 'text-white' : 'text-zinc-300'}`}>
+                                            {row.value}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {row.sub && (
+                                        <span className="text-[10px] text-zinc-600 leading-relaxed">{row.sub}</span>
+                                      )}
+                                    </div>
+                                  )
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })() : (
+                        <div className="flex flex-col items-center py-12 space-y-3">
+                          <div className={`text-[9px] mono px-3 py-1 rounded-full font-bold border ${
+                            state.ep1Status === 'loading' ? 'border-amber-500 text-amber-400 animate-pulse' :
+                            state.ep1Status === 'error' ? 'border-red-500 text-red-400' :
+                            'border-zinc-700 text-zinc-500'
+                          }`}>
+                            EP1 {state.ep1Status === 'loading' ? 'GENERATING...' : state.ep1Status.toUpperCase()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* JSON 내보내기 */}
+                      <div className="flex justify-end pt-2">
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([JSON.stringify(state.grammarResult, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `blueprint_${state.projectName.replace(/\s+/g, '_')}.json`;
+                            a.click();
+                          }}
+                          className="text-[10px] mono bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-zinc-400 hover:text-white transition-colors"
+                        >
+                          RAW JSON EXPORT ↓
+                        </button>
                       </div>
                     </div>
                   )}
@@ -333,6 +405,103 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
             </div>
           </div>
         </div>
+
+        {/* ── Floor Plan Generator ─────────────────────────────────── */}
+        {state.grammarResult && (
+          <div className="border border-zinc-800 bg-zinc-950 mb-6 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-black">
+              <div>
+                <h2 className="mono text-[11px] text-emerald-500 font-bold uppercase tracking-widest">Floor Plan Generation</h2>
+                <p className="text-[10px] text-zinc-600 mono mt-0.5">HouseDiffusion ML · 층별 평면 자동 생성</p>
+              </div>
+              <button
+                onClick={handleGenerateFloorplan}
+                disabled={floorplanLoading}
+                className={`mono text-[10px] font-bold uppercase px-5 py-2 border transition-all ${
+                  floorplanLoading
+                    ? 'border-zinc-700 text-zinc-600 cursor-not-allowed'
+                    : 'border-emerald-600 text-emerald-400 hover:bg-emerald-600 hover:text-black'
+                }`}
+              >
+                {floorplanLoading ? '생성 중...' : 'GENERATE FLOOR PLANS'}
+              </button>
+            </div>
+
+            {/* 로딩 */}
+            {floorplanLoading && (
+              <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                <div className="mono text-xs text-zinc-500">ML 추론 중 — 층별 순서로 처리됩니다...</div>
+                <div className="text-[10px] text-zinc-700 mono">GPU 사용 시 층당 약 30~60초 소요</div>
+              </div>
+            )}
+
+            {/* 오류 */}
+            {floorplanError && (
+              <div className="p-6">
+                <div className="bg-red-950/30 border border-red-900 p-4 text-xs text-red-400 mono">
+                  <div className="font-bold mb-1">오류</div>
+                  <div>{floorplanError}</div>
+                  <div className="mt-2 text-red-600 text-[10px]">
+                    → Anaconda Prompt에서 <span className="text-red-400">python server.py</span> 실행 확인
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 결과 */}
+            {floorplanResult && (
+              <div className="p-6 space-y-6">
+                <div className="flex gap-4 text-[10px] mono text-zinc-500">
+                  <span>사이트: {floorplanResult.site_width_mm / 1000}m × {floorplanResult.site_depth_mm / 1000}m</span>
+                  <span>·</span>
+                  <span>층고: {floorplanResult.floor_to_floor_mm / 1000}m</span>
+                  <span>·</span>
+                  <span>{floorplanResult.floors.length}개 층 생성됨</span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {floorplanResult.floors.map(f => (
+                    <div key={f.floor} className="border border-zinc-800 bg-black">
+                      <div className="px-3 py-1.5 border-b border-zinc-800 mono text-[9px] text-zinc-500 uppercase">
+                        Floor {f.floor}
+                      </div>
+                      <img
+                        src={`data:image/png;base64,${f.png_base64}`}
+                        alt={`Floor ${f.floor}`}
+                        className="w-full"
+                      />
+                      <div className="px-3 py-2 space-y-0.5">
+                        {f.rooms.map(r => (
+                          <div key={r.room_id} className="flex justify-between text-[9px] mono text-zinc-600">
+                            <span className="truncate max-w-[100px]">{r.room_name}</span>
+                            <span className="text-zinc-700">{r.area_m2?.toFixed(1)}m²</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(floorplanResult, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `floorplan_${state.projectName.replace(/\s+/g, '_')}.json`;
+                      a.click();
+                    }}
+                    className="text-[10px] mono bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-zinc-400 hover:text-white transition-colors"
+                  >
+                    FLOORPLAN JSON EXPORT ↓
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <button onClick={handleRestart} className="w-full py-4 border border-zinc-700 hover:bg-zinc-900 text-sm mono uppercase transition-all">
           RESET SYSTEM & START NEW PROJECT
@@ -505,7 +674,7 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                             <span className="mono text-zinc-600">{p.id}</span>
                             <span className="text-zinc-300 truncate max-w-[100px]">{p.label}</span>
                           </div>
-                          <span className="mono text-emerald-500">{Math.round(p.area_target_m2)}m2</span>
+                          <span className="mono text-emerald-500">{Math.round(p.area_target_mm2 / 1e6)} m²</span>
                         </div>
                       ))}
                     </div>

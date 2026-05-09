@@ -21,10 +21,10 @@ Program Tree는 다음 계층 구조를 따른다:
 Category(L1) → Cluster(L2) → Space(L3)
 
 규칙:
-1. BlueprintJSON.computed.gross_floor_area_m2를 총 GFA로 사용하라.
+1. BlueprintJSON.computed.gross_floor_area_mm2를 총 GFA로 사용하라. (단위: mm²)
 2. BlueprintJSON.grammar.program.base_ratios로 카테고리별 면적 비율을 결정하라.
 3. EP1 Pattern Library에서 선택된 패턴들의 cluster_templates를 기반으로 클러스터를 생성하라.
-4. 각 Space는 space_type, category_label, cluster_id, quantity, area(each_m2, total_m2), placement(floor_preference, span)를 반드시 포함하라.
+4. 각 Space는 space_type, category_label, cluster_id, quantity, area(each_mm2, total_mm2), placement(floor_preference, span)를 반드시 포함하라. (면적 단위: mm²)
 5. 층수(BlueprintJSON.inputs.floors)와 사이트 조건에 맞게 floor_preference를 배분하라.
 6. Space ID는 SP-0001부터 순차 부여, Cluster ID는 CLU-001부터 부여하라.
 7. Relation graph는 EP1 Relation auto-generation 규칙에 따라 DIRECT_ACCESS/ADJACENT/NEAR/SEPARATE 엣지를 생성하라.
@@ -49,11 +49,11 @@ const EP1_RESPONSE_SCHEMA = {
           area: {
             type: Type.OBJECT,
             properties: {
-              each_m2: { type: Type.NUMBER },
-              total_m2: { type: Type.NUMBER },
+              each_mm2: { type: Type.NUMBER },
+              total_mm2: { type: Type.NUMBER },
               net_or_gross: { type: Type.STRING },
             },
-            required: ["each_m2", "total_m2", "net_or_gross"],
+            required: ["each_mm2", "total_mm2", "net_or_gross"],
           },
           placement: {
             type: Type.OBJECT,
@@ -187,9 +187,9 @@ ${JSON.stringify(relationAutoGenRules, null, 2)}
 ${JSON.stringify(blueprint, null, 2)}
 
 위 BlueprintJSON과 EP1 규칙을 사용하여 구체적인 Program Tree를 생성하라.
-총 GFA: ${blueprint.computed.gross_floor_area_m2}m²
+총 GFA: ${blueprint.computed.gross_floor_area_mm2}mm²
 층수: ${blueprint.inputs.floors}층
-사이트 면적: ${blueprint.computed.site_area_m2}m²
+사이트 면적: ${blueprint.computed.site_area_mm2}mm²
 `;
 
   const response = await ai.models.generateContent({
