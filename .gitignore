@@ -18,7 +18,10 @@ dist-ssr
 *.local
 
 # Claude Code
-.claude/
+# Ignore local/personal Claude state, but keep shared project config + vendored plugins
+.claude/*
+!.claude/settings.json
+!.claude/plugins/
 
 # Editor directories and files
 .vscode/*
