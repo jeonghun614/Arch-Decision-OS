@@ -3,6 +3,7 @@ import { CHECKPOINT_LABELS } from '@/types';
 import mappingData from '@/data/dc_to_grammar_mapping.json';
 import { AppContext } from '../hooks/useProjectState';
 import { buildDesignBrief } from '../utils/designBrief';
+import DecisionChainDiagram from './DecisionChainDiagram';
 
 const DIFFUSION_SERVER = 'http://localhost:5050';
 
@@ -101,6 +102,8 @@ const ResultPage: React.FC<Props> = ({ ctx }) => {
                 ))}
               </div>
             </div>
+
+            <DecisionChainDiagram logs={state.logs} />
 
             {/* 2. Design Logic Explanation */}
             <div className="border border-zinc-800 p-6 bg-black relative">
