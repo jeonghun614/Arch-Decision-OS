@@ -91,3 +91,28 @@ export function computeAxisProfile(logs: DecisionLog[]): AxisStance[] {
     };
   });
 }
+
+export function previewOption(
+  profile: AxisStance[],
+  checkpoint: Checkpoint,
+  optionId: string
+): Partial<Record<AxisName, AxisJudgement>> {
+  const opt = findOption(checkpoint, optionId);
+  if (!opt) return {};
+  const axes: Record<string, string> =
+    checkpoint === Checkpoint.DC1 ? (opt.bias_axis_pref ?? {}) : (opt.engine_axes ?? {});
+  const byAxis = new Map(profile.map(s => [s.axis, s]));
+  const out: Partial<Record<AxisName, AxisJudgement>> = {};
+  for (const [axisKey, value] of Object.entries(axes)) {
+    const axis = axisKey as AxisName;
+    const stance = byAxis.get(axis);
+    if (!stance) continue;
+    if (stance.forbidden !== null && value === stance.forbidden) { out[axis] = 'forbidden'; continue; }
+    const baseline = stance.current ?? stance.preferred;
+    if (baseline === null) { out[axis] = 'new'; continue; }
+    if (value === baseline) { out[axis] = 'match'; continue; }
+    if (isWeakPair(axis, value, baseline)) { out[axis] = 'weak'; continue; }
+    out[axis] = 'conflict';
+  }
+  return out;
+}

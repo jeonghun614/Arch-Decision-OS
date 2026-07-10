@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Checkpoint, DecisionLog } from '../types';
-import { computeAxisProfile } from './axisProfile';
+import { computeAxisProfile, previewOption } from './axisProfile';
 
 const log = (checkpoint: Checkpoint, id: string | string[]): DecisionLog => ({
   checkpoint,
@@ -85,5 +85,46 @@ describe('computeAxisProfile', () => {
       expect(stance.claims).toEqual([]);
       expect(stance.preferred).toBeNull();
     }
+  });
+});
+
+describe('previewOption', () => {
+  it('DC1-01 이후 DC2.E: forbidden/conflict/new가 판정된다', () => {
+    const profile = computeAxisProfile([log(Checkpoint.DC1, 'DC1-01')]);
+    const p = previewOption(profile, Checkpoint.DC2, 'DC2.E');
+    // DC2.E: Sharing MANDATORY == DC1-01 forbidden → forbidden
+    expect(p.Sharing).toBe('forbidden');
+    // Exposure HIGH vs preferred LOW (weak pair 아님) → conflict
+    expect(p.Exposure).toBe('conflict');
+    // Separation INTEGRATED vs preferred SEPARATED (weak pair 아님) → conflict
+    expect(p.Separation).toBe('conflict');
+    // Encounter OPTIONAL: current/preferred 없음(DC1-01 pref에 Encounter 없음) → new
+    expect(p.Encounter).toBe('new');
+  });
+
+  it('DC1-01 이후 DC2.A: preferred와 일치하면 match (claims 없어도)', () => {
+    const profile = computeAxisProfile([log(Checkpoint.DC1, 'DC1-01')]);
+    const p = previewOption(profile, Checkpoint.DC2, 'DC2.A');
+    expect(p.Exposure).toBe('match');     // LOW == preferred LOW
+    expect(p.Separation).toBe('match');   // SEPARATED == preferred SEPARATED
+  });
+
+  it('DC1-01 이후 DC2.B: weak pair 판정', () => {
+    const profile = computeAxisProfile([log(Checkpoint.DC1, 'DC1-01')]);
+    const p = previewOption(profile, Checkpoint.DC2, 'DC2.B');
+    expect(p.Exposure).toBe('weak');      // MID vs LOW
+    expect(p.Separation).toBe('weak');    // BUFFERED vs SEPARATED
+  });
+
+  it('빈 프로파일에서 DC1 옵션 미리보기: bias_axis_pref가 new로 표시된다', () => {
+    const profile = computeAxisProfile([]);
+    const p = previewOption(profile, Checkpoint.DC1, 'DC1-01');
+    expect(p.Exposure).toBe('new');
+    expect(p.Separation).toBe('new');
+  });
+
+  it('알 수 없는 옵션 id는 빈 객체를 반환한다', () => {
+    const profile = computeAxisProfile([]);
+    expect(previewOption(profile, Checkpoint.DC2, 'NOPE')).toEqual({});
   });
 });
