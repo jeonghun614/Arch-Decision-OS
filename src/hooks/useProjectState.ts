@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Checkpoint, ProjectState, VisualGuide, CHECKPOINT_ORDER, CHECKPOINT_LIMITS } from '@/types';
-import { runKernel, generateFinalReport, generateVisualGuide as generateVisualGuideApi, generateImagePrompt } from '@/services/geminiService';
+import { runKernel, generateFinalReport, generateVisualGuide as generateVisualGuideApi, generateImagePrompt } from '@/services/aiService';
 import { runEP1ProgramTree } from '@/services/ep1Service';
 import { runEP2Pipeline } from '@/services/ep2Runner';
 import { compileGrammar } from '@/services/grammarCompiler';
