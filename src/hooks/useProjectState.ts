@@ -131,13 +131,7 @@ export function useProjectState() {
         ep1Status: 'loading',
       }));
 
-      let apiKey = '';
-      if (window.aistudio) {
-        apiKey = await (window.aistudio as any).getApiKey?.() ?? '';
-      }
-      if (!apiKey) apiKey = process.env.GEMINI_API_KEY ?? process.env.API_KEY ?? '';
-
-      const programTree = await runEP1ProgramTree(grammarResult, apiKey);
+      const programTree = await runEP1ProgramTree(grammarResult);
 
       setState(prev => ({
         ...prev,
