@@ -99,6 +99,8 @@ export function previewOption(
 ): Partial<Record<AxisName, AxisJudgement>> {
   const opt = findOption(checkpoint, optionId);
   if (!opt) return {};
+  // DC1은 engine_axes가 없어 bias_axis_pref를 주장 값으로 쓴다. anti_axis_forbid는
+  // 옵션이 '거부'하는 값이지 주장하는 값이 아니므로 미리보기 판정에서 제외한다 (스펙 §3.2의 의도적 좁힘).
   const axes: Record<string, string> =
     checkpoint === Checkpoint.DC1 ? (opt.bias_axis_pref ?? {}) : (opt.engine_axes ?? {});
   const byAxis = new Map(profile.map(s => [s.axis, s]));

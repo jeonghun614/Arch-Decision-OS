@@ -127,4 +127,19 @@ describe('previewOption', () => {
     const profile = computeAxisProfile([]);
     expect(previewOption(profile, Checkpoint.DC2, 'NOPE')).toEqual({});
   });
+
+  it('current가 있으면 preferred보다 우선한다 (baseline = current ?? preferred)', () => {
+    // DC1-01 preferred: { Exposure: LOW, Separation: SEPARATED }
+    // DC2.E claims: Exposure HIGH, Separation INTEGRATED → current가 preferred와 달라진다
+    const profile = computeAxisProfile([
+      log(Checkpoint.DC1, 'DC1-01'),
+      log(Checkpoint.DC2, 'DC2.E'),
+    ]);
+    // DC2.A: Exposure LOW / Separation SEPARATED —
+    // current(HIGH/INTEGRATED) 기준이면 conflict, preferred 기준이면 match가 되므로
+    // 이 테스트는 우선순위가 뒤집히는 회귀를 잡아낸다
+    const p = previewOption(profile, Checkpoint.DC2, 'DC2.A');
+    expect(p.Exposure).toBe('conflict');
+    expect(p.Separation).toBe('conflict');
+  });
 });
