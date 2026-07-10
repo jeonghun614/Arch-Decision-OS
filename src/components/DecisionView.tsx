@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Checkpoint, CHECKPOINT_ORDER, CHECKPOINT_LABELS, CHECKPOINT_LIMITS } from '@/types';
 import { AppContext } from '../hooks/useProjectState';
+import AxisProfilePanel from './AxisProfilePanel';
 
 interface Props {
   ctx: AppContext;
@@ -16,8 +17,11 @@ const DecisionView: React.FC<Props> = ({ ctx }) => {
     handleGoBack,
   } = ctx;
 
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const k = state.lastEngineOutput;
   const maxLimit = CHECKPOINT_LIMITS[state.currentCheckpoint];
+  const previewId =
+    hoverId ?? (currentSelections.length > 0 ? currentSelections[currentSelections.length - 1] : null);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#050505] text-zinc-300 font-sans">
@@ -49,6 +53,12 @@ const DecisionView: React.FC<Props> = ({ ctx }) => {
               </div>
             </div>
 
+            <AxisProfilePanel
+              logs={state.logs}
+              checkpoint={state.currentCheckpoint}
+              previewId={previewId}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
               {/* Allowed Options */}
               <div>
@@ -71,6 +81,8 @@ const DecisionView: React.FC<Props> = ({ ctx }) => {
                       <button
                         key={opt.id}
                         onClick={() => handleToggleOption(opt.id)}
+                        onMouseEnter={() => setHoverId(opt.id)}
+                        onMouseLeave={() => setHoverId(null)}
                         className={`w-full text-left p-4 border transition-all duration-200 relative group ${
                           isSelected
                             ? 'border-emerald-600 bg-emerald-900/10'
