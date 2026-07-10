@@ -173,6 +173,23 @@ if (fs.existsSync(dist)) {
   });
 }
 
+// express.json()의 SyntaxError 등 라우트 바깥에서 발생한 오류도
+// {error:{status,message}} JSON 계약을 지키게 한다
+const jsonErrorHandler: express.ErrorRequestHandler = (err, _req, res, _next) => {
+  const status =
+    err && typeof err === "object" && "status" in err && typeof (err as { status: unknown }).status === "number"
+      ? (err as { status: number }).status
+      : 500;
+  const message =
+    status === 400
+      ? "요청 본문이 올바른 JSON이 아닙니다."
+      : err instanceof Error
+        ? err.message
+        : "알 수 없는 서버 오류";
+  res.status(status).json({ error: { status, message } });
+};
+app.use(jsonErrorHandler);
+
 const PORT = Number(process.env.PORT ?? 8787);
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
