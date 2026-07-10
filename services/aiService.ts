@@ -12,7 +12,7 @@ const DIAGRAM_TYPES: Record<Checkpoint, string> = {
   [Checkpoint.DC7]: "Expression Logic (표현 논리)"
 };
 
-// ── getOptionDetails: geminiService.ts의 동명 함수를 그대로 이동 (무변경) ──
+// ── getOptionDetails: 원본 서비스 모듈의 동명 함수를 그대로 이동 (무변경) ──
 function getOptionDetails(checkpoint: Checkpoint, id: string): any {
   let list: any[] = [];
   switch (checkpoint) {

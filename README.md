@@ -10,11 +10,16 @@ View your app in AI Studio: https://ai.studio/apps/2a6cec07-97bc-4bb7-9039-858f2
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:**  Node.js 22+
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Create `.env.local` in the project root with your Claude API key
+   (server-side only — never bundled into the browser):
+   `ANTHROPIC_API_KEY=sk-ant-...`
+3. Run the app (Vite dev server + API proxy):
    `npm run dev`
+4. Open http://localhost:3000
+
+**Production:** `npm run start` builds the frontend and serves it with
+the API proxy on http://localhost:8787.

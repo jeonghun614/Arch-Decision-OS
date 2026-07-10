@@ -108,7 +108,7 @@ route("/api/visual-guide", async (body) => {
 });
 
 route("/api/image-prompt", async (body) => {
-  // services/geminiService.ts generateImagePrompt의 contents 템플릿을 그대로 옮긴다
+  // 원본 AI 서비스 모듈 generateImagePrompt의 contents 템플릿을 그대로 옮긴다
   // (You are an expert prompt engineer ... Return ONLY the prompt string ...).
   // logicDetails/guideHints는 프론트가 조립해 보낸 문자열이다.
   const user = `

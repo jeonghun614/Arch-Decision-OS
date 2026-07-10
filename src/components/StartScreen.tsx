@@ -6,7 +6,7 @@ interface Props {
 }
 
 const StartScreen: React.FC<Props> = ({ ctx }) => {
-  const { state, setState, hasApiKey, handleOpenSelectKey, handleStart } = ctx;
+  const { state, setState, handleStart } = ctx;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#050505] text-zinc-300">
@@ -104,22 +104,6 @@ const StartScreen: React.FC<Props> = ({ ctx }) => {
             INITIALIZE SYSTEM
           </button>
         </div>
-
-        {!hasApiKey && (
-          <div className="mt-8 p-4 border border-indigo-900/50 bg-indigo-950/20 rounded-sm">
-            <p className="text-xs text-indigo-300 mb-3 mono">
-              Gemini 3 모델을 사용하기 위해 API 키 선택이 필요합니다.
-              <br/>
-              <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="underline">유료 프로젝트</a>의 키를 선택해주세요.
-            </p>
-            <button
-              onClick={handleOpenSelectKey}
-              className="w-full py-2 bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] mono font-bold uppercase transition-all"
-            >
-              SELECT API KEY
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

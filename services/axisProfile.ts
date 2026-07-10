@@ -24,7 +24,7 @@ const ALL_AXES: AxisName[] = [
   "Separation", "Centrality", "Mass", "Expression",
 ];
 
-// DC2/DC5는 라이브러리에서 'type' 필드가 id 역할 (geminiService.getOptionDetails와 동일 규칙)
+// DC2/DC5는 라이브러리에서 'type' 필드가 id 역할 (aiService.getOptionDetails와 동일 규칙)
 function findOption(checkpoint: Checkpoint, id: string): any | null {
   const lists: Record<Checkpoint, any[]> = {
     [Checkpoint.DC1]: DC_LIBRARY.dc1_options,

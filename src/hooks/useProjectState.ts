@@ -12,7 +12,6 @@ export function useProjectState() {
   const location = useLocation();
   const [state, setState] = useState<ProjectState>(() => loadSavedState().state);
   const [isStarted, setIsStarted] = useState(() => loadSavedState().isStarted);
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
 
@@ -58,25 +57,6 @@ export function useProjectState() {
       if (started) navigate(CP_TO_PATH[cur.currentCheckpoint], { replace: true });
     }
   }, [location.pathname, navigate]);
-
-  useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(selected);
-      } else {
-        setHasApiKey(true);
-      }
-    };
-    checkApiKey();
-  }, []);
-
-  const handleOpenSelectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
-    }
-  };
 
   const triggerKernel = useCallback(async () => {
     if (kernelRunningRef.current) return;
@@ -313,7 +293,6 @@ export function useProjectState() {
     setState,
     isStarted,
     setIsStarted,
-    hasApiKey,
     loading,
     generatingReport,
     visualGuide,
@@ -328,7 +307,6 @@ export function useProjectState() {
     setActiveTab,
     currentSelections,
     location,
-    handleOpenSelectKey,
     triggerKernel,
     handleGenerateVisualGuide,
     handleGeneratePrompt,
